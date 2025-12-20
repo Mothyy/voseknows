@@ -7,8 +7,16 @@ import apiClient from "@/lib/api";
 import type { Transaction } from "@/data/transactions";
 import type { Category } from "@/pages/Categories";
 
+import { CategorySelector } from "@/components/category-selector";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,6 +35,7 @@ const TransactionActions: React.FC<{
 }> = ({ row, table }) => {
     const transaction = row.original;
     const [categories, setCategories] = React.useState<Category[]>([]);
+    const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
     // The refresh function is passed via the table's `meta` property.
     const refreshData = (table.options.meta as any)?.refreshData;
@@ -36,10 +45,7 @@ const TransactionActions: React.FC<{
         const fetchCategories = async () => {
             try {
                 const response = await apiClient.get<Category[]>("/categories");
-                // Filter out "Uncategorized" if it exists, as we have a special menu item for it.
-                setCategories(
-                    response.data.filter((c) => c.name !== "Uncategorized"),
-                );
+                setCategories(response.data);
             } catch (error) {
                 console.error(
                     "Failed to fetch categories for dropdown:",
@@ -59,6 +65,7 @@ const TransactionActions: React.FC<{
             if (refreshData) {
                 refreshData();
             }
+            setIsDialogOpen(false);
         } catch (error) {
             console.error("Failed to update category:", error);
             // In a real app, you would show a toast notification here.
@@ -67,38 +74,48 @@ const TransactionActions: React.FC<{
     };
 
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                    <span className="sr-only">Open menu</span>
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem
-                    onClick={() =>
-                        navigator.clipboard.writeText(transaction.id)
-                    }
-                >
-                    Copy transaction ID
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Change Category</DropdownMenuLabel>
-                {categories.map((category) => (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
                     <DropdownMenuItem
-                        key={category.id}
-                        onClick={() => handleSetCategory(category.id)}
+                        onClick={() =>
+                            navigator.clipboard.writeText(transaction.id)
+                        }
                     >
-                        {category.name}
+                        Copy transaction ID
                     </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleSetCategory(null)}>
-                    Mark as Uncategorized
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+                    <DropdownMenuSeparator />
+                    <DialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            Change Category
+                        </DropdownMenuItem>
+                    </DialogTrigger>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <DialogContent className="sm:max-w-[400px]">
+                <DialogHeader>
+                    <DialogTitle>Assign Category</DialogTitle>
+                </DialogHeader>
+                <div className="py-4">
+                    <CategorySelector
+                        categories={categories}
+                        value={transaction.category_id || "uncategorized"}
+                        onChange={(val) =>
+                            handleSetCategory(
+                                val === "uncategorized" ? null : val,
+                            )
+                        }
+                    />
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 };
 

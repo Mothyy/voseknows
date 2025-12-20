@@ -9,9 +9,10 @@ import {
     flexRender,
     getCoreRowModel,
     getFilteredRowModel,
-    getPaginationRowModel,
     getSortedRowModel,
     useReactTable,
+    RowSelectionState,
+    OnChangeFn,
 } from "@tanstack/react-table";
 
 import {
@@ -37,6 +38,12 @@ interface DataTableProps<TData, TValue> {
     data: TData[];
     filterColumnId?: string;
     refreshData?: () => void;
+    rowSelection?: RowSelectionState;
+    onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+    onSearch?: (value: string) => void;
+    onLoadMore?: () => void;
+    hasMore?: boolean;
+    isLoading?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -44,13 +51,24 @@ export function DataTable<TData, TValue>({
     data,
     filterColumnId,
     refreshData,
+    rowSelection: controlledRowSelection,
+    onRowSelectionChange: setControlledRowSelection,
+    onSearch,
+    onLoadMore,
+    hasMore,
+    isLoading,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] =
         React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] =
         React.useState<VisibilityState>({});
-    const [rowSelection, setRowSelection] = React.useState({});
+    const [internalRowSelection, setInternalRowSelection] =
+        React.useState<RowSelectionState>({});
+
+    const rowSelection = controlledRowSelection ?? internalRowSelection;
+    const setRowSelection =
+        setControlledRowSelection ?? setInternalRowSelection;
 
     const table = useReactTable({
         data,
@@ -61,7 +79,6 @@ export function DataTable<TData, TValue>({
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         onColumnVisibilityChange: setColumnVisibility,
@@ -74,6 +91,34 @@ export function DataTable<TData, TValue>({
         },
     });
 
+    const observerTarget = React.useRef(null);
+
+    React.useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (
+                    entries[0].isIntersecting &&
+                    hasMore &&
+                    !isLoading &&
+                    onLoadMore
+                ) {
+                    onLoadMore();
+                }
+            },
+            { threshold: 1.0 },
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => {
+            if (observerTarget.current) {
+                observer.unobserve(observerTarget.current);
+            }
+        };
+    }, [hasMore, isLoading, onLoadMore]);
+
     return (
         <div className="w-full">
             <div className="flex items-center py-4">
@@ -85,11 +130,13 @@ export function DataTable<TData, TValue>({
                                 .getColumn(filterColumnId)
                                 ?.getFilterValue() as string) ?? ""
                         }
-                        onChange={(event) =>
+                        onChange={(event) => {
+                            const value = event.target.value;
                             table
                                 .getColumn(filterColumnId)
-                                ?.setFilterValue(event.target.value)
-                        }
+                                ?.setFilterValue(value);
+                            onSearch?.(value);
+                        }}
                         className="max-w-sm"
                     />
                 )}
@@ -170,31 +217,24 @@ export function DataTable<TData, TValue>({
                                 </TableCell>
                             </TableRow>
                         )}
+                        <TableRow ref={observerTarget}>
+                            <TableCell
+                                colSpan={columns.length}
+                                className="h-2 p-0"
+                            />
+                        </TableRow>
                     </TableBody>
                 </Table>
             </div>
+            {isLoading && (
+                <div className="py-4 text-center text-sm text-muted-foreground">
+                    Loading more...
+                </div>
+            )}
             <div className="flex items-center justify-end space-x-2 py-4">
                 <div className="flex-1 text-sm text-muted-foreground">
-                    {table.getFilteredSelectedRowModel().rows.length} of{" "}
+                    {Object.keys(rowSelection).length} of{" "}
                     {table.getFilteredRowModel().rows.length} row(s) selected.
-                </div>
-                <div className="space-x-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.previousPage()}
-                        disabled={!table.getCanPreviousPage()}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.nextPage()}
-                        disabled={!table.getCanNextPage()}
-                    >
-                        Next
-                    </Button>
                 </div>
             </div>
         </div>

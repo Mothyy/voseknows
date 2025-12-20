@@ -12,6 +12,44 @@ const { query } = require("../db");
  */
 router.get("/", async (req: Request, res: Response) => {
     try {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 50;
+        const search = (req.query.search as string) || "";
+        const categoryId = req.query.categoryId as string;
+        const accountId = req.query.accountId as string;
+
+        const offset = (page - 1) * limit;
+        const params: any[] = [];
+        const whereClauses: string[] = [];
+
+        if (search) {
+            params.push(`%${search}%`);
+            whereClauses.push(`t.description ILIKE $${params.length}`);
+        }
+
+        if (accountId && accountId !== "all") {
+            params.push(accountId);
+            whereClauses.push(`t.account_id = $${params.length}`);
+        }
+
+        if (categoryId) {
+            if (categoryId === "uncategorized") {
+                whereClauses.push(`t.category_id IS NULL`);
+            } else if (categoryId !== "all") {
+                params.push(categoryId);
+                whereClauses.push(`t.category_id = $${params.length}`);
+            }
+        }
+
+        const whereSQL =
+            whereClauses.length > 0
+                ? `WHERE ${whereClauses.join(" AND ")}`
+                : "";
+
+        const countSql = `SELECT COUNT(*) as total FROM transactions t ${whereSQL}`;
+        const countResult = await query(countSql, params);
+        const total = parseInt(countResult.rows[0].total);
+
         const sql = `
             SELECT
                 t.id,
@@ -26,12 +64,53 @@ router.get("/", async (req: Request, res: Response) => {
             FROM transactions t
             JOIN accounts a ON t.account_id = a.id
             LEFT JOIN categories c ON t.category_id = c.id
-            ORDER BY t.date DESC, t.created_at DESC;
+            ${whereSQL}
+            ORDER BY t.date DESC, t.created_at DESC
+            LIMIT $${params.length + 1} OFFSET $${params.length + 2};
         `;
-        const { rows } = await query(sql, []);
-        res.json(rows);
+        const { rows } = await query(sql, [...params, limit, offset]);
+
+        res.json({
+            data: rows,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        });
     } catch (err: any) {
         console.error("Error fetching transactions:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+/**
+ * @route   POST /api/transactions/bulk-update
+ * @desc    Bulk update transactions (e.g. categorize multiple)
+ * @access  Public
+ */
+router.post("/bulk-update", async (req: Request, res: Response) => {
+    const { transactionIds, categoryId } = req.body;
+
+    if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
+        return res.status(400).json({ error: "No transaction IDs provided" });
+    }
+
+    try {
+        const sql = `
+            UPDATE transactions
+            SET category_id = $1
+            WHERE id = ANY($2::uuid[])
+        `;
+        const { rowCount } = await query(sql, [
+            categoryId || null,
+            transactionIds,
+        ]);
+
+        res.json({ message: `Successfully updated ${rowCount} transactions` });
+    } catch (err: any) {
+        console.error("Error bulk updating transactions:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
