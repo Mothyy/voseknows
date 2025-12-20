@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ColumnDef, Row } from "@tanstack/react-table";
+import { ColumnDef, Row, Table } from "@tanstack/react-table";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 import apiClient from "@/lib/api";
 import type { Transaction } from "@/data/transactions";
@@ -21,13 +21,15 @@ import { cn } from "@/lib/utils";
 
 // A new, self-contained component to handle the logic for the actions dropdown.
 // It fetches its own category data and calls an update function passed via table meta.
-const TransactionActions: React.FC<{ row: Row<Transaction> }> = ({ row }) => {
+const TransactionActions: React.FC<{
+    row: Row<Transaction>;
+    table: Table<Transaction>;
+}> = ({ row, table }) => {
     const transaction = row.original;
     const [categories, setCategories] = React.useState<Category[]>([]);
 
     // The refresh function is passed via the table's `meta` property.
-    const refreshData = (row.getContext().table.options.meta as any)
-        ?.refreshData;
+    const refreshData = (table.options.meta as any)?.refreshData;
 
     // Fetch categories once when the component mounts.
     React.useEffect(() => {
@@ -149,10 +151,16 @@ export const columns: ColumnDef<Transaction>[] = [
         header: "Description",
     },
     {
+        accessorKey: "account",
+        header: "Account",
+    },
+    {
         accessorKey: "amount",
         header: () => <div className="text-right">Amount</div>,
         cell: ({ row }) => {
-            const amount = parseFloat(row.getValue("amount"));
+            const val = row.getValue("amount");
+            const amount =
+                typeof val === "string" ? parseFloat(val) : Number(val);
             const formatted = new Intl.NumberFormat("en-US", {
                 style: "currency",
                 currency: "USD",
@@ -199,6 +207,8 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         id: "actions",
-        cell: ({ row }) => <TransactionActions row={row} />,
+        cell: ({ row, table }) => (
+            <TransactionActions row={row} table={table} />
+        ),
     },
 ];

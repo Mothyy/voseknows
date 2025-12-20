@@ -79,7 +79,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
             form.reset({
                 name: account.name,
                 type: account.type as "checking" | "savings" | "credit",
-                balance: account.balance,
+                balance: account.starting_balance,
                 include_in_budget: account.include_in_budget,
             });
         } else {
@@ -95,9 +95,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
     const onSubmit = async (values: AccountFormValues) => {
         try {
             if (isEditMode && account) {
-                // We don't have a PATCH endpoint for accounts yet, but this is how it would work
-                // await apiClient.patch(`/accounts/${account.id}`, values);
-                alert("Updating accounts is not yet implemented."); // Placeholder
+                await apiClient.patch(`/accounts/${account.id}`, values);
             } else {
                 // Create new account
                 await apiClient.post("/accounts", values);
@@ -184,7 +182,11 @@ const AccountForm: React.FC<AccountFormProps> = ({
                             name="balance"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Initial Balance</FormLabel>
+                                    <FormLabel>Starting Balance</FormLabel>
+                                    <FormDescription>
+                                        The balance before any imported
+                                        transactions.
+                                    </FormDescription>
                                     <FormControl>
                                         <Input
                                             type="number"

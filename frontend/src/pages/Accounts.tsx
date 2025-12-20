@@ -6,17 +6,21 @@ import {
     CreditCard,
     PiggyBank,
     ShieldCheck,
+    MoreVertical,
+    Edit,
+    Trash,
 } from "lucide-react";
 import apiClient from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import AccountForm from "./AccountForm";
+import { ImportTransactionsDialog } from "@/components/import-transactions-dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-} from "@/components/ui/card";
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 // Define the shape of an Account object based on our API
@@ -25,6 +29,7 @@ export type Account = {
     name: string;
     type: "checking" | "savings" | "credit" | string; // Allow for other types
     balance: number;
+    starting_balance: number;
     include_in_budget: boolean;
 };
 
@@ -55,6 +60,26 @@ const AccountsPage: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(
+        null,
+    );
+
+    const handleEdit = (account: Account) => {
+        setSelectedAccount(account);
+        setIsFormOpen(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (window.confirm("Are you sure you want to delete this account?")) {
+            try {
+                await apiClient.delete(`/accounts/${id}`);
+                fetchAccounts();
+            } catch (err) {
+                console.error("Failed to delete account:", err);
+                alert("Failed to delete account.");
+            }
+        }
+    };
 
     const fetchAccounts = async () => {
         try {
@@ -92,18 +117,48 @@ const AccountsPage: React.FC = () => {
         return (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {accounts.map((account) => (
-                    <Link
-                        to={`/accounts/${account.id}`}
-                        key={account.id}
-                        className="rounded-lg transition-transform hover:scale-105"
-                    >
-                        <Card className="h-full">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-lg font-medium">
-                                    {account.name}
-                                </CardTitle>
+                    <Card key={account.id} className="h-full">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <div className="flex items-center gap-2">
                                 {getAccountIcon(account.type)}
-                            </CardHeader>
+                                <Link
+                                    to={`/accounts/${account.id}`}
+                                    className="hover:underline"
+                                >
+                                    <CardTitle className="text-lg font-medium">
+                                        {account.name}
+                                    </CardTitle>
+                                </Link>
+                            </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        className="h-8 w-8 p-0"
+                                    >
+                                        <span className="sr-only">
+                                            Open menu
+                                        </span>
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                        onClick={() => handleEdit(account)}
+                                    >
+                                        <Edit className="mr-2 h-4 w-4" /> Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() => handleDelete(account.id)}
+                                        className="text-red-600"
+                                    >
+                                        <Trash className="mr-2 h-4 w-4" />{" "}
+                                        Delete
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </CardHeader>
+                        <Link to={`/accounts/${account.id}`}>
                             <CardContent>
                                 <div
                                     className={cn(
@@ -125,8 +180,8 @@ const AccountsPage: React.FC = () => {
                                     </div>
                                 )}
                             </CardContent>
-                        </Card>
-                    </Link>
+                        </Link>
+                    </Card>
                 ))}
             </div>
         );
@@ -144,16 +199,30 @@ const AccountsPage: React.FC = () => {
                             An overview of your financial accounts.
                         </p>
                     </div>
-                    <Button onClick={() => setIsFormOpen(true)}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add New Account
-                    </Button>
+                    <div className="flex gap-2">
+                        <ImportTransactionsDialog
+                            onUploadSuccess={fetchAccounts}
+                        />
+                        <Button
+                            onClick={() => {
+                                setSelectedAccount(null);
+                                setIsFormOpen(true);
+                            }}
+                        >
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add New Account
+                        </Button>
+                    </div>
                 </div>
                 {renderContent()}
             </div>
             <AccountForm
+                account={selectedAccount}
                 isOpen={isFormOpen}
-                onClose={() => setIsFormOpen(false)}
+                onClose={() => {
+                    setIsFormOpen(false);
+                    setSelectedAccount(null);
+                }}
                 onSuccess={fetchAccounts}
             />
         </>

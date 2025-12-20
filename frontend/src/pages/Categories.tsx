@@ -178,7 +178,7 @@ const CategoriesPage: React.FC = () => {
 
             if (!movedCategory) return { newTree: nodes, movedCategory: null };
 
-            movedCategory.parent_id = newParentId;
+            (movedCategory as Category).parent_id = newParentId;
 
             // Now, add the category to its new parent
             const findAndAdd = (

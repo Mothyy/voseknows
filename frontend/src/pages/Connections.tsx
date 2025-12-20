@@ -71,7 +71,7 @@ const ConnectionsPage: React.FC = () => {
         }
     };
 
-    const handleDelete = async (connectionId: string) => {
+    const handleDelete = async (_connectionId: string) => {
         try {
             // We don't have a DELETE endpoint yet, but this is how it would work
             // await apiClient.delete(`/data-providers/connections/${connectionId}`);

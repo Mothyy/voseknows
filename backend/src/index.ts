@@ -12,6 +12,7 @@ const transactionRoutes = require("./routes/transactions");
 const accountRoutes = require("./routes/accounts");
 const categoryRoutes = require("./routes/categories");
 const dataProviderRoutes = require("./routes/dataProviders");
+const importRoutes = require("./routes/imports");
 
 // Configure dotenv to read .env file
 dotenv.config();
@@ -28,6 +29,7 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/accounts", accountRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/data-providers", dataProviderRoutes);
+app.use("/api/imports", importRoutes);
 
 // A simple root route to confirm the server is running
 app.get("/", (req: Request, res: Response) => {
@@ -57,4 +59,5 @@ app.listen(port, () => {
     console.log("  - GET /api/categories");
     console.log("  - POST /api/data-providers/connections");
     console.log("  - POST /api/data-providers/connections/:id/sync");
+    console.log("  - POST /api/imports");
 });

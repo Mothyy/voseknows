@@ -2,12 +2,22 @@ import React, { useState, useEffect } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { columns } from "@/components/tables/columns";
 import { Transaction } from "@/data/transactions";
+import { Account } from "@/pages/Accounts";
 import apiClient from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { PlusCircle } from "lucide-react";
 
 const TransactionsPage: React.FC = () => {
     const [data, setData] = useState<Transaction[]>([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [selectedAccountId, setSelectedAccountId] = useState<string>("all");
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +40,21 @@ const TransactionsPage: React.FC = () => {
 
     useEffect(() => {
         fetchTransactions();
+        const fetchAccounts = async () => {
+            try {
+                const response = await apiClient.get<Account[]>("/accounts");
+                setAccounts(response.data);
+            } catch (err) {
+                console.error("Failed to fetch accounts:", err);
+            }
+        };
+        fetchAccounts();
     }, []);
+
+    const filteredData =
+        selectedAccountId && selectedAccountId !== "all"
+            ? data.filter((t) => t.account_id === selectedAccountId)
+            : data;
 
     const renderContent = () => {
         if (loading) {
@@ -49,11 +73,14 @@ const TransactionsPage: React.FC = () => {
                 </div>
             );
         }
-        <DataTable
-            columns={columns}
-            data={data}
-            filterColumnId="description"
-        />;
+        return (
+            <DataTable
+                columns={columns}
+                data={filteredData}
+                filterColumnId="description"
+                refreshData={fetchTransactions}
+            />
+        );
     };
 
     return (
@@ -67,10 +94,28 @@ const TransactionsPage: React.FC = () => {
                         A list of your recent transactions from the database.
                     </p>
                 </div>
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add New Transaction
-                </Button>
+                <div className="flex gap-2">
+                    <Select
+                        value={selectedAccountId}
+                        onValueChange={setSelectedAccountId}
+                    >
+                        <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="Filter by Account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Accounts</SelectItem>
+                            {accounts.map((account) => (
+                                <SelectItem key={account.id} value={account.id}>
+                                    {account.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add New Transaction
+                    </Button>
+                </div>
             </div>
             {renderContent()}
         </div>
