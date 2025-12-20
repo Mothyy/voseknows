@@ -1,0 +1,163 @@
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import {
+    PlusCircle,
+    Landmark,
+    CreditCard,
+    PiggyBank,
+    ShieldCheck,
+} from "lucide-react";
+import apiClient from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import AccountForm from "./AccountForm";
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    CardDescription,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+// Define the shape of an Account object based on our API
+export type Account = {
+    id: string;
+    name: string;
+    type: "checking" | "savings" | "credit" | string; // Allow for other types
+    balance: number;
+    include_in_budget: boolean;
+};
+
+// Helper to format currency
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+    }).format(amount);
+};
+
+// Helper to get an icon based on account type
+const getAccountIcon = (type: Account["type"]) => {
+    switch (type.toLowerCase()) {
+        case "checking":
+            return <Landmark className="h-6 w-6 text-muted-foreground" />;
+        case "savings":
+            return <PiggyBank className="h-6 w-6 text-muted-foreground" />;
+        case "credit":
+            return <CreditCard className="h-6 w-6 text-muted-foreground" />;
+        default:
+            return <Landmark className="h-6 w-6 text-muted-foreground" />;
+    }
+};
+
+const AccountsPage: React.FC = () => {
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isFormOpen, setIsFormOpen] = useState(false);
+
+    const fetchAccounts = async () => {
+        try {
+            setLoading(true);
+            const response = await apiClient.get<Account[]>("/accounts");
+            setAccounts(response.data);
+            setError(null);
+        } catch (err) {
+            console.error("Failed to fetch accounts:", err);
+            setError("Failed to load accounts. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAccounts();
+    }, []);
+
+    const renderContent = () => {
+        if (loading) {
+            return (
+                <div className="flex items-center justify-center py-10">
+                    <p className="text-muted-foreground">Loading accounts...</p>
+                </div>
+            );
+        }
+        if (error) {
+            return (
+                <div className="flex items-center justify-center py-10">
+                    <p className="text-red-500">{error}</p>
+                </div>
+            );
+        }
+        return (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {accounts.map((account) => (
+                    <Link
+                        to={`/accounts/${account.id}`}
+                        key={account.id}
+                        className="rounded-lg transition-transform hover:scale-105"
+                    >
+                        <Card className="h-full">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-lg font-medium">
+                                    {account.name}
+                                </CardTitle>
+                                {getAccountIcon(account.type)}
+                            </CardHeader>
+                            <CardContent>
+                                <div
+                                    className={cn(
+                                        "text-3xl font-bold",
+                                        account.balance >= 0
+                                            ? "text-green-600"
+                                            : "text-red-600",
+                                    )}
+                                >
+                                    {formatCurrency(account.balance)}
+                                </div>
+                                <p className="text-xs capitalize text-muted-foreground">
+                                    {account.type} Account
+                                </p>
+                                {account.include_in_budget && (
+                                    <div className="mt-4 flex items-center text-xs text-muted-foreground">
+                                        <ShieldCheck className="mr-1 h-4 w-4 text-green-500" />
+                                        <span>Included in budget</span>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </Link>
+                ))}
+            </div>
+        );
+    };
+
+    return (
+        <>
+            <div className="container mx-auto py-10 px-4">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">
+                            Accounts
+                        </h1>
+                        <p className="text-muted-foreground mt-1">
+                            An overview of your financial accounts.
+                        </p>
+                    </div>
+                    <Button onClick={() => setIsFormOpen(true)}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add New Account
+                    </Button>
+                </div>
+                {renderContent()}
+            </div>
+            <AccountForm
+                isOpen={isFormOpen}
+                onClose={() => setIsFormOpen(false)}
+                onSuccess={fetchAccounts}
+            />
+        </>
+    );
+};
+
+export default AccountsPage;

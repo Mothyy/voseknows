@@ -1,0 +1,91 @@
+version: "3.8"
+
+services:
+    frontend:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
+        container_name: frontend
+        ports:
+            - "5173:5173"
+        volumes:
+            - ./frontend:/app
+            - /app/node_modules
+        environment:
+            - CHOKIDAR_USEPOLLING=true
+        env_file:
+            - ./frontend/.env
+        networks:
+            - voseknows-network
+
+    backend:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile
+        container_name: backend
+        ports:
+            - "3001:3001"
+        volumes:
+            - ./backend:/app
+            - /app/node_modules
+        env_file:
+            - ./backend/.env
+        environment:
+            - DATABASE_URL=postgres://user:password@db:5432/voseknowsdb
+        depends_on:
+            db:
+                condition: service_healthy
+        networks:
+            - voseknows-network
+
+    db:
+        image: postgres:15-alpine
+        container_name: postgres_db
+        restart: always
+        environment:
+            POSTGRES_USER: user
+            POSTGRES_PASSWORD: password
+            POSTGRES_DB: voseknowsdb
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+            # The entrypoint script will always run this schema file on a fresh DB.
+            - ./backend/db-init/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+        networks:
+            - voseknows-network
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U user -d voseknowsdb"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    db-seeder:
+        image: postgres:15-alpine
+        container_name: db_seeder
+        depends_on:
+            db:
+                condition: service_healthy
+        networks:
+            - voseknows-network
+        volumes:
+            # Mount the entire directory so the script can find the .sql file.
+            - ./backend/db-init:/db-seed
+        environment:
+            # This is our custom flag to control seeding.
+            # Change to "false" to disable seeding for production.
+            RUN_SEEDING: "true"
+            # These are for psql to connect to the database.
+            POSTGRES_USER: user
+            PGPASSWORD: password # Note: PGPASSWORD is used by psql automatically.
+            POSTGRES_DB: voseknowsdb
+            PGHOST: db # The hostname of the database service.
+        # The command to execute our conditional seeding script.
+        command: sh /db-seed/run-seeding.sh
+
+networks:
+    voseknows-network:
+        driver: bridge
+
+volumes:
+    postgres_data:
