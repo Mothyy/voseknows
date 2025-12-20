@@ -2,7 +2,8 @@ import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import MainLayout from "./MainLayout";
 import Dashboard from "@/pages/Dashboard";
 import Transactions from "@/pages/Transactions";
-import CategoriesPage from "@/pages/Categories";
+import Categories from "./pages/Categories";
+import Budget from "./pages/Budget";
 import AccountsPage from "@/pages/Accounts";
 import AccountDetailPage from "@/pages/AccountDetailPage";
 import ConnectionsPage from "@/pages/Connections";
@@ -29,11 +30,8 @@ function App() {
                         path="accounts/:id"
                         element={<AccountDetailPage />}
                     />
-                    <Route path="categories" element={<CategoriesPage />} />
-                    <Route
-                        path="budgets"
-                        element={<GenericPage title="Budgets" />}
-                    />
+                    <Route path="categories" element={<Categories />} />
+                    <Route path="budgets" element={<Budget />} />
                     <Route
                         path="reports"
                         element={<GenericPage title="Reports" />}
