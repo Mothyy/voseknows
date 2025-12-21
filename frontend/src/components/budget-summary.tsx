@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowUp, ArrowDown } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface BudgetSummaryItem {
     category_id: string;
@@ -120,7 +121,25 @@ export function BudgetSummary({ startDate }: BudgetSummaryProps) {
             </div>
 
             {loading ? (
-                <div className="text-center py-10">Loading summary...</div>
+                <div className="space-y-6">
+                    <div className="grid gap-4 md:grid-cols-3">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <Card key={i}>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <Skeleton className="h-4 w-[100px]" />
+                                </CardHeader>
+                                <CardContent>
+                                    <Skeleton className="h-8 w-[120px]" />
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                    <div className="rounded-md border p-4 space-y-4">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <Skeleton key={i} className="h-8 w-full" />
+                        ))}
+                    </div>
+                </div>
             ) : error ? (
                 <div className="text-center text-red-500 py-10">{error}</div>
             ) : (

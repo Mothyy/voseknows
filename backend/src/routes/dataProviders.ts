@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 const express = require("express");
 const router = express.Router();
 const { query, pool } = require("../db");
-import createSissClient from "../sissClient";
+const createSissClient = require("../sissClient");
 
 /**
  * @route   GET /api/data-providers

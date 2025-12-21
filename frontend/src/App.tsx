@@ -7,6 +7,7 @@ import Budget from "./pages/Budget";
 import AccountsPage from "@/pages/Accounts";
 import AccountDetailPage from "@/pages/AccountDetailPage";
 import ConnectionsPage from "@/pages/Connections";
+import ReportsPage from "@/pages/Reports";
 
 // A simple placeholder for other pages
 const GenericPage = ({ title }: { title: string }) => (
@@ -32,10 +33,7 @@ function App() {
                     />
                     <Route path="categories" element={<Categories />} />
                     <Route path="budgets" element={<Budget />} />
-                    <Route
-                        path="reports"
-                        element={<GenericPage title="Reports" />}
-                    />
+                    <Route path="reports" element={<ReportsPage />} />
                     <Route
                         path="settings/profile"
                         element={<GenericPage title="Profile Settings" />}

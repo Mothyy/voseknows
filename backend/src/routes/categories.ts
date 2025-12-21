@@ -1,5 +1,5 @@
-import type { Request, Response } from "express";
-const express = require("express");
+import express = require("express");
+import { Request, Response } from "express";
 const router = express.Router();
 const { query } = require("../db");
 

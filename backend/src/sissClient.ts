@@ -13,9 +13,14 @@ const SISS_API_BASE_URL = "https://dev.sissdata.com.au";
  * @param {string} customerId - The `customer-id` for the specific user/connection.
  * @returns {AxiosInstance} A configured Axios client ready to make requests.
  */
-const createSissClient = (apiKey: string, customerId: string): AxiosInstance => {
+const createSissClient = (
+    apiKey: string,
+    customerId: string,
+): AxiosInstance => {
     if (!apiKey || !customerId) {
-        throw new Error("SISS API key and customer ID are required to create a client.");
+        throw new Error(
+            "SISS API key and customer ID are required to create a client.",
+        );
     }
 
     return axios.create({
@@ -28,4 +33,4 @@ const createSissClient = (apiKey: string, customerId: string): AxiosInstance => 
     });
 };
 
-export default createSissClient;
+module.exports = createSissClient;

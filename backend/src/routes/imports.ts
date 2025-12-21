@@ -1,6 +1,6 @@
 import express = require("express");
 import multer = require("multer");
-import { ImportService } from "../services/importService";
+const { ImportService } = require("../services/importService");
 
 const router = express.Router();
 // Store files in memory as they are text and we process them immediately

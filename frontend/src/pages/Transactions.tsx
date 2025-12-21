@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { columns } from "@/components/tables/columns";
 import { Transaction } from "@/data/transactions";
@@ -46,47 +46,97 @@ const TransactionsPage: React.FC = () => {
     // Bulk Actions
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const fetchTransactions = async (
         reset: boolean = false,
         currentPage: number = 1,
+        filters?: {
+            accountId: string;
+            categoryId: string;
+            search: string;
+        },
     ) => {
-        try {
-            setLoading(true);
-            const params = new URLSearchParams({
-                page: currentPage.toString(),
-                limit: "50",
-                search: searchQuery,
-            });
+        const currentAccountId = filters
+            ? filters.accountId
+            : selectedAccountId;
+        const currentCategoryId = filters
+            ? filters.categoryId
+            : selectedCategoryId;
+        const currentSearchQuery = filters ? filters.search : searchQuery;
 
-            if (selectedAccountId && selectedAccountId !== "all") {
-                params.append("accountId", selectedAccountId);
+        if (reset) {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
             }
-            if (selectedCategoryId && selectedCategoryId !== "all") {
-                params.append("categoryId", selectedCategoryId);
+            abortControllerRef.current = new AbortController();
+        } else {
+            if (
+                !abortControllerRef.current ||
+                abortControllerRef.current.signal.aborted
+            ) {
+                abortControllerRef.current = new AbortController();
+            }
+        }
+
+        const signal = abortControllerRef.current.signal;
+
+        try {
+            console.log("Fetching transactions...", {
+                reset,
+                currentPage,
+                currentAccountId,
+                currentCategoryId,
+                currentSearchQuery,
+            });
+            setLoading(true);
+            const params: any = {
+                page: currentPage,
+                limit: 50,
+                search: currentSearchQuery,
+            };
+
+            if (currentAccountId && currentAccountId !== "all") {
+                params.accountId = currentAccountId;
+            }
+            if (currentCategoryId && currentCategoryId !== "all") {
+                params.categoryId = currentCategoryId;
             }
 
             const response = await apiClient.get<TransactionResponse>(
-                `/transactions?${params.toString()}`,
+                "/transactions",
+                { params, signal },
             );
 
+            console.log("Transactions fetched:", response.data);
+
             if (reset) {
-                setData(response.data.data);
+                setData(response.data.data || []);
                 setRowSelection({});
             } else {
-                setData((prev) => [...prev, ...response.data.data]);
+                setData((prev) => [...prev, ...(response.data.data || [])]);
             }
 
-            setHasMore(currentPage < response.data.pagination.totalPages);
+            setHasMore(
+                response.data.pagination
+                    ? currentPage < response.data.pagination.totalPages
+                    : false,
+            );
             setPage(currentPage + 1);
             setError(null);
-        } catch (err) {
+        } catch (err: any) {
+            if (err.name === "CanceledError" || err.code === "ERR_CANCELED") {
+                console.log("Request canceled");
+                return;
+            }
             console.error("Failed to fetch transactions:", err);
             setError(
                 "Failed to load transactions. Please check the backend connection.",
             );
         } finally {
-            setLoading(false);
+            if (!signal.aborted) {
+                setLoading(false);
+            }
         }
     };
 
@@ -98,8 +148,8 @@ const TransactionsPage: React.FC = () => {
                     apiClient.get<Account[]>("/accounts"),
                     apiClient.get<Category[]>("/categories"),
                 ]);
-                setAccounts(accRes.data);
-                setCategories(catRes.data);
+                setAccounts(Array.isArray(accRes.data) ? accRes.data : []);
+                setCategories(Array.isArray(catRes.data) ? catRes.data : []);
             } catch (err) {
                 console.error("Failed to fetch metadata:", err);
             }
@@ -109,10 +159,33 @@ const TransactionsPage: React.FC = () => {
 
     // Fetch on filter change
     useEffect(() => {
+        console.log("Filter changed:", {
+            selectedAccountId,
+            selectedCategoryId,
+            searchQuery,
+        });
+
+        // Reset state immediately to prevent stale data display
+        setData([]);
+        setPage(1);
+        setHasMore(true);
+        setRowSelection({});
+        setLoading(true);
+
         const timer = setTimeout(() => {
-            fetchTransactions(true, 1);
+            fetchTransactions(true, 1, {
+                accountId: selectedAccountId,
+                categoryId: selectedCategoryId,
+                search: searchQuery,
+            });
         }, 300);
-        return () => clearTimeout(timer);
+
+        return () => {
+            clearTimeout(timer);
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
     }, [selectedAccountId, selectedCategoryId, searchQuery]);
 
     const handleLoadMore = () => {
@@ -149,15 +222,6 @@ const TransactionsPage: React.FC = () => {
     };
 
     const renderContent = () => {
-        if (loading && data.length === 0) {
-            return (
-                <div className="flex items-center justify-center py-10">
-                    <p className="text-muted-foreground">
-                        Loading transactions...
-                    </p>
-                </div>
-            );
-        }
         if (error) {
             return (
                 <div className="flex items-center justify-center py-10">
@@ -213,14 +277,15 @@ const TransactionsPage: React.FC = () => {
                                 <SelectItem value="all">
                                     All Accounts
                                 </SelectItem>
-                                {accounts.map((account) => (
-                                    <SelectItem
-                                        key={account.id}
-                                        value={account.id}
-                                    >
-                                        {account.name}
-                                    </SelectItem>
-                                ))}
+                                {Array.isArray(accounts) &&
+                                    accounts.map((account) => (
+                                        <SelectItem
+                                            key={account.id}
+                                            value={account.id}
+                                        >
+                                            {account.name}
+                                        </SelectItem>
+                                    ))}
                             </SelectContent>
                         </Select>
 

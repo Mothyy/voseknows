@@ -10,7 +10,7 @@ interface ImportResult {
     }[];
 }
 
-export class ImportService {
+class ImportService {
     async importOfx(
         ofxData: string,
         targetAccountId?: string,
@@ -202,3 +202,7 @@ export class ImportService {
         };
     }
 }
+
+module.exports = {
+    ImportService,
+};

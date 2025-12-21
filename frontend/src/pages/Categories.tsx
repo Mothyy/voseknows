@@ -12,6 +12,7 @@ import {
 } from "@dnd-kit/core";
 import apiClient from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import CategoryForm from "./CategoryForm"; // Import the new form component
 import CategoryTree from "./CategoryTree";
 
@@ -234,10 +235,13 @@ const CategoriesPage: React.FC = () => {
     const renderContent = () => {
         if (loading) {
             return (
-                <div className="flex items-center justify-center py-10">
-                    <p className="text-muted-foreground">
-                        Loading categories...
-                    </p>
+                <div className="space-y-2">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="flex items-center p-2">
+                            <Skeleton className="mr-2 h-6 w-6 rounded-md" />
+                            <Skeleton className="h-4 w-[200px]" />
+                        </div>
+                    ))}
                 </div>
             );
         }

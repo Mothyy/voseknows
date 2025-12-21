@@ -27,5 +27,11 @@ export default defineConfig({
             protocol: "ws",
             host: "nasv3",
         },
+        proxy: {
+            "/api": {
+                target: "http://backend:3001",
+                changeOrigin: true,
+            },
+        },
     },
 });

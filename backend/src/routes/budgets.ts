@@ -1,6 +1,5 @@
 import express = require("express");
-import type { Request, Response } from "express";
-
+import { Request, Response } from "express";
 const router = express.Router();
 const { query } = require("../db");
 
@@ -13,7 +12,9 @@ router.get("/", async (req: Request, res: Response) => {
     const month = req.query.month as string;
 
     if (!month) {
-        return res.status(400).json({ error: "Month parameter is required (YYYY-MM-DD)" });
+        return res
+            .status(400)
+            .json({ error: "Month parameter is required (YYYY-MM-DD)" });
     }
 
     try {
@@ -73,18 +74,24 @@ router.get("/report", async (req: Request, res: Response) => {
     const month = req.query.month as string; // 'YYYY-MM-01'
 
     if (!month) {
-        return res.status(400).json({ error: "Month parameter is required (YYYY-MM-DD)" });
+        return res
+            .status(400)
+            .json({ error: "Month parameter is required (YYYY-MM-DD)" });
     }
 
     try {
         // Calculate start and end date of the month for transaction filtering
         // Assuming 'month' passed is the first day of the month
         const startDate = new Date(month);
-        const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0); // Last day of month
+        const endDate = new Date(
+            startDate.getFullYear(),
+            startDate.getMonth() + 1,
+            0,
+        ); // Last day of month
 
         // Format for SQL
-        const startStr = startDate.toISOString().split('T')[0];
-        const endStr = endDate.toISOString().split('T')[0];
+        const startStr = startDate.toISOString().split("T")[0];
+        const endStr = endDate.toISOString().split("T")[0];
 
         const sql = `
             WITH monthly_actuals AS (
@@ -120,7 +127,6 @@ router.get("/report", async (req: Request, res: Response) => {
         // Note: For parameter $3 (budget month), we expect exact date match if stored as date 'YYYY-MM-01'
         const { rows } = await query(sql, [startStr, endStr, month]);
         res.json(rows);
-
     } catch (err: any) {
         console.error("Error fetching budget report:", err);
         res.status(500).json({ error: "Internal Server Error" });
@@ -136,7 +142,9 @@ router.get("/summary", async (req: Request, res: Response) => {
     const startDate = req.query.startDate as string;
 
     if (!startDate) {
-        return res.status(400).json({ error: "startDate parameter is required (YYYY-MM-DD)" });
+        return res
+            .status(400)
+            .json({ error: "startDate parameter is required (YYYY-MM-DD)" });
     }
 
     try {

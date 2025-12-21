@@ -13,10 +13,14 @@ const { query } = require("../db");
 router.get("/", async (req: Request, res: Response) => {
     try {
         const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 50;
+        let limit = parseInt(req.query.limit as string) || 50;
         const search = (req.query.search as string) || "";
         const categoryId = req.query.categoryId as string;
         const accountId = req.query.accountId as string;
+
+        if (search) {
+            limit = 10000;
+        }
 
         const offset = (page - 1) * limit;
         const params: any[] = [];
@@ -45,6 +49,14 @@ router.get("/", async (req: Request, res: Response) => {
             whereClauses.length > 0
                 ? `WHERE ${whereClauses.join(" AND ")}`
                 : "";
+
+        console.log("Fetching transactions:", {
+            accountId,
+            categoryId,
+            search,
+            whereSQL,
+            params,
+        });
 
         const countSql = `SELECT COUNT(*) as total FROM transactions t ${whereSQL}`;
         const countResult = await query(countSql, params);

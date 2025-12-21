@@ -25,13 +25,14 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[];
@@ -44,6 +45,7 @@ interface DataTableProps<TData, TValue> {
     onLoadMore?: () => void;
     hasMore?: boolean;
     isLoading?: boolean;
+    totalCount?: number;
 }
 
 export function DataTable<TData, TValue>({
@@ -51,92 +53,76 @@ export function DataTable<TData, TValue>({
     data,
     filterColumnId,
     refreshData,
-    rowSelection: controlledRowSelection,
-    onRowSelectionChange: setControlledRowSelection,
+    rowSelection = {},
+    onRowSelectionChange,
     onSearch,
     onLoadMore,
     hasMore,
     isLoading,
+    totalCount,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] =
         React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] =
         React.useState<VisibilityState>({});
-    const [internalRowSelection, setInternalRowSelection] =
-        React.useState<RowSelectionState>({});
-
-    const rowSelection = controlledRowSelection ?? internalRowSelection;
-    const setRowSelection =
-        setControlledRowSelection ?? setInternalRowSelection;
 
     const table = useReactTable({
         data,
         columns,
-        meta: {
-            refreshData,
-        },
-        onSortingChange: setSorting,
-        onColumnFiltersChange: setColumnFilters,
-        getCoreRowModel: getCoreRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
-        onColumnVisibilityChange: setColumnVisibility,
-        onRowSelectionChange: setRowSelection,
         state: {
             sorting,
             columnFilters,
             columnVisibility,
             rowSelection,
         },
+        enableRowSelection: true,
+        onRowSelectionChange,
+        onSortingChange: setSorting,
+        onColumnFiltersChange: setColumnFilters,
+        onColumnVisibilityChange: setColumnVisibility,
+        getCoreRowModel: getCoreRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        meta: {
+            refreshData,
+        },
     });
 
-    const observerTarget = React.useRef(null);
+    // Observer for infinite scroll
+    const observerTarget = React.useRef<HTMLTableRowElement>(null);
 
     React.useEffect(() => {
+        if (!hasMore || isLoading || !onLoadMore) return;
+
         const observer = new IntersectionObserver(
             (entries) => {
-                if (
-                    entries[0].isIntersecting &&
-                    hasMore &&
-                    !isLoading &&
-                    onLoadMore
-                ) {
+                if (entries[0].isIntersecting) {
                     onLoadMore();
                 }
             },
-            { threshold: 1.0 },
+            { threshold: 0.1, rootMargin: "100px" },
         );
 
-        if (observerTarget.current) {
-            observer.observe(observerTarget.current);
+        const currentTarget = observerTarget.current;
+        if (currentTarget) {
+            observer.observe(currentTarget);
         }
 
         return () => {
-            if (observerTarget.current) {
-                observer.unobserve(observerTarget.current);
+            if (currentTarget) {
+                observer.unobserve(currentTarget);
             }
         };
     }, [hasMore, isLoading, onLoadMore]);
 
     return (
-        <div className="w-full">
-            <div className="flex items-center py-4">
+        <div className="w-full space-y-4">
+            <div className="flex items-center gap-4">
                 {filterColumnId && (
                     <Input
                         placeholder={`Filter by ${filterColumnId}...`}
-                        value={
-                            (table
-                                .getColumn(filterColumnId)
-                                ?.getFilterValue() as string) ?? ""
-                        }
-                        onChange={(event) => {
-                            const value = event.target.value;
-                            table
-                                .getColumn(filterColumnId)
-                                ?.setFilterValue(value);
-                            onSearch?.(value);
-                        }}
+                        onChange={(event) => onSearch?.(event.target.value)}
                         className="max-w-sm"
                     />
                 )}
@@ -150,64 +136,76 @@ export function DataTable<TData, TValue>({
                         {table
                             .getAllColumns()
                             .filter((column) => column.getCanHide())
-                            .map((column) => {
-                                return (
-                                    <DropdownMenuCheckboxItem
-                                        key={column.id}
-                                        className="capitalize"
-                                        checked={column.getIsVisible()}
-                                        onCheckedChange={(value) =>
-                                            column.toggleVisibility(!!value)
-                                        }
-                                    >
-                                        {column.id}
-                                    </DropdownMenuCheckboxItem>
-                                );
-                            })}
+                            .map((column) => (
+                                <DropdownMenuCheckboxItem
+                                    key={column.id}
+                                    className="capitalize"
+                                    checked={column.getIsVisible()}
+                                    onCheckedChange={(value) =>
+                                        column.toggleVisibility(!!value)
+                                    }
+                                >
+                                    {column.id}
+                                </DropdownMenuCheckboxItem>
+                            ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
+
             <div className="rounded-md border">
                 <Table>
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
-                                {headerGroup.headers.map((header) => {
-                                    return (
-                                        <TableHead key={header.id}>
-                                            {header.isPlaceholder
-                                                ? null
-                                                : flexRender(
-                                                      header.column.columnDef
-                                                          .header,
-                                                      header.getContext(),
-                                                  )}
-                                        </TableHead>
-                                    );
-                                })}
+                                {headerGroup.headers.map((header) => (
+                                    <TableHead key={header.id}>
+                                        {!header.isPlaceholder &&
+                                            flexRender(
+                                                header.column.columnDef.header,
+                                                header.getContext(),
+                                            )}
+                                    </TableHead>
+                                ))}
                             </TableRow>
                         ))}
                     </TableHeader>
                     <TableBody>
-                        {table.getRowModel().rows?.length ? (
-                            table.getRowModel().rows.map((row) => (
-                                <TableRow
-                                    key={row.id}
-                                    data-state={
-                                        row.getIsSelected() && "selected"
-                                    }
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
-                                            {flexRender(
-                                                cell.column.columnDef.cell,
-                                                cell.getContext(),
-                                            )}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            ))
-                        ) : (
+                        {/* If we have data, show it */}
+                        {table.getRowModel().rows.map((row) => (
+                            <TableRow
+                                key={row.id}
+                                data-state={row.getIsSelected() && "selected"}
+                            >
+                                {row.getVisibleCells().map((cell) => (
+                                    <TableCell key={cell.id}>
+                                        {flexRender(
+                                            cell.column.columnDef.cell,
+                                            cell.getContext(),
+                                        )}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        ))}
+
+                        {/* Loading skeletons - shown when data is empty OR when loading more */}
+                        {isLoading && (
+                            <>
+                                {Array.from({
+                                    length: data.length === 0 ? 10 : 3,
+                                }).map((_, i) => (
+                                    <TableRow key={`skeleton-${i}`}>
+                                        {columns.map((_, j) => (
+                                            <TableCell key={`cell-${j}`}>
+                                                <Skeleton className="h-6 w-full" />
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                            </>
+                        )}
+
+                        {/* End of results / Empty state */}
+                        {!isLoading && data.length === 0 && (
                             <TableRow>
                                 <TableCell
                                     colSpan={columns.length}
@@ -217,24 +215,32 @@ export function DataTable<TData, TValue>({
                                 </TableCell>
                             </TableRow>
                         )}
-                        <TableRow ref={observerTarget}>
+
+                        {/* The observer trigger - hidden but present */}
+                        <TableRow ref={observerTarget} className="border-0">
                             <TableCell
                                 colSpan={columns.length}
-                                className="h-2 p-0"
+                                className="p-0 h-1 border-0"
                             />
                         </TableRow>
                     </TableBody>
                 </Table>
             </div>
-            {isLoading && (
-                <div className="py-4 text-center text-sm text-muted-foreground">
-                    Loading more...
-                </div>
-            )}
-            <div className="flex items-center justify-end space-x-2 py-4">
+
+            <div className="flex items-center justify-between px-2 py-4">
                 <div className="flex-1 text-sm text-muted-foreground">
                     {Object.keys(rowSelection).length} of{" "}
-                    {table.getFilteredRowModel().rows.length} row(s) selected.
+                    {totalCount || data.length} row(s) selected
+                </div>
+                {isLoading && data.length > 0 && (
+                    <div className="flex items-center text-sm text-muted-foreground animate-pulse">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Fetching more...
+                    </div>
+                )}
+                <div className="text-sm text-muted-foreground">
+                    Showing {data.length} {totalCount ? `of ${totalCount}` : ""}{" "}
+                    results
                 </div>
             </div>
         </div>

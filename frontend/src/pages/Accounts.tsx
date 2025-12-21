@@ -21,6 +21,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 // Define the shape of an Account object based on our API
@@ -102,8 +103,19 @@ const AccountsPage: React.FC = () => {
     const renderContent = () => {
         if (loading) {
             return (
-                <div className="flex items-center justify-center py-10">
-                    <p className="text-muted-foreground">Loading accounts...</p>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <Card key={i} className="h-full">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <Skeleton className="h-5 w-[150px]" />
+                                <Skeleton className="h-6 w-6 rounded-full" />
+                            </CardHeader>
+                            <CardContent>
+                                <Skeleton className="h-9 w-[120px] mb-2" />
+                                <Skeleton className="h-4 w-[100px]" />
+                            </CardContent>
+                        </Card>
+                    ))}
                 </div>
             );
         }

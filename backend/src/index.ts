@@ -14,12 +14,13 @@ const categoryRoutes = require("./routes/categories");
 const dataProviderRoutes = require("./routes/dataProviders");
 const importRoutes = require("./routes/imports");
 const budgetRoutes = require("./routes/budgets");
+const reportRoutes = require("./routes/reports");
 
 // Configure dotenv to read .env file
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3001;
 
 // Middleware setup
 app.use(cors());
@@ -32,6 +33,7 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/data-providers", dataProviderRoutes);
 app.use("/api/imports", importRoutes);
 app.use("/api/budgets", budgetRoutes);
+app.use("/api/reports", reportRoutes);
 
 // A simple root route to confirm the server is running
 app.get("/", (req: Request, res: Response) => {
@@ -53,8 +55,9 @@ app.get("/db-test", async (req: Request, res: Response) => {
 });
 
 // Start the server
-app.listen(port, () => {
-    console.log(`Backend server is running at http://localhost:${port}`);
+app.listen(port, "0.0.0.0", () => {
+    console.log(`Backend server is running at http://0.0.0.0:${port}`);
+    console.log(`Startup Time: ${new Date().toISOString()}`);
     console.log("Available routes:");
     console.log("  - GET /api/transactions");
     console.log("  - GET /api/accounts");
@@ -63,4 +66,6 @@ app.listen(port, () => {
     console.log("  - POST /api/data-providers/connections/:id/sync");
     console.log("  - POST /api/imports");
     console.log("  - GET /api/budgets");
+    console.log("  - GET /api/reports/summary");
+    console.log("  - GET /api/dashboard");
 });
