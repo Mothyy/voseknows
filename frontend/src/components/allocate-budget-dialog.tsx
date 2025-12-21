@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
     Dialog,
     DialogContent,
@@ -21,6 +21,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface BudgetCategory {
     category_id: string;
@@ -42,7 +43,7 @@ export function AllocateBudgetDialog({
     month,
     onSuccess,
 }: AllocateBudgetDialogProps) {
-    const [budgets, setBudgets] = useState<BudgetCategory[]>([]);
+    const [rawBudgets, setRawBudgets] = useState<BudgetCategory[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [futureMonths, setFutureMonths] = useState(0);
@@ -64,7 +65,7 @@ export function AllocateBudgetDialog({
             const response = await apiClient.get<BudgetCategory[]>(
                 `/budgets?month=${formattedMonth}`,
             );
-            setBudgets(response.data);
+            setRawBudgets(response.data);
         } catch (error) {
             console.error("Failed to fetch budgets:", error);
         } finally {
@@ -72,13 +73,65 @@ export function AllocateBudgetDialog({
         }
     };
 
-    const handleAmountChange = (index: number, value: string) => {
-        const newBudgets = [...budgets];
-        newBudgets[index] = {
-            ...newBudgets[index],
-            budget_amount: parseFloat(value) || 0,
+    /**
+     * Process the flat list into a display-friendly ordered list with depth and parent status.
+     * Also calculates auto-summed values for parents.
+     */
+    const tableData = useMemo(() => {
+        const parentIds = new Set(
+            rawBudgets.map((b) => b.parent_id).filter(Boolean),
+        );
+
+        const getSum = (parentId: string): number => {
+            const children = rawBudgets.filter((b) => b.parent_id === parentId);
+            return children.reduce((acc, child) => {
+                if (parentIds.has(child.category_id)) {
+                    return acc + getSum(child.category_id);
+                }
+                return acc + Number(child.budget_amount || 0);
+            }, 0);
         };
-        setBudgets(newBudgets);
+
+        const result: (BudgetCategory & {
+            depth: number;
+            isParent: boolean;
+            displayValue: number;
+        })[] = [];
+
+        const addToResult = (parentId: string | null, depth: number) => {
+            const level = rawBudgets
+                .filter((b) => b.parent_id === parentId)
+                .sort((a, b) => a.category_name.localeCompare(b.category_name));
+
+            level.forEach((cat) => {
+                const isParent = parentIds.has(cat.category_id);
+                result.push({
+                    ...cat,
+                    depth,
+                    isParent,
+                    displayValue: isParent
+                        ? getSum(cat.category_id)
+                        : Number(cat.budget_amount || 0),
+                });
+                if (isParent) {
+                    addToResult(cat.category_id, depth + 1);
+                }
+            });
+        };
+
+        addToResult(null, 0);
+        return result;
+    }, [rawBudgets]);
+
+    const handleAmountChange = (categoryId: string, value: string) => {
+        const amount = parseFloat(value) || 0;
+        setRawBudgets((prev) =>
+            prev.map((b) =>
+                b.category_id === categoryId
+                    ? { ...b, budget_amount: amount }
+                    : b,
+            ),
+        );
     };
 
     const handleCopyPrior = async (source: "budget" | "actual") => {
@@ -105,11 +158,11 @@ export function AllocateBudgetDialog({
                 );
                 newData = response.data.map((b: any) => ({
                     category_id: b.category_id,
-                    amount: b.actual,
+                    amount: Math.abs(b.actual || 0),
                 }));
             }
 
-            setBudgets((current) =>
+            setRawBudgets((current) =>
                 current.map((cat) => {
                     const match = newData.find(
                         (d) => d.category_id === cat.category_id,
@@ -130,8 +183,10 @@ export function AllocateBudgetDialog({
         try {
             setSaving(true);
             const promises: Promise<any>[] = [];
+            const parentIds = new Set(
+                rawBudgets.map((b) => b.parent_id).filter(Boolean),
+            );
 
-            // Save for current month and any future months
             for (let i = 0; i <= futureMonths; i++) {
                 const targetDate = new Date(month);
                 targetDate.setMonth(targetDate.getMonth() + i);
@@ -139,14 +194,16 @@ export function AllocateBudgetDialog({
                     targetDate.getMonth() + 1,
                 ).padStart(2, "0")}-01`;
 
-                budgets.forEach((budget) => {
-                    promises.push(
-                        apiClient.post("/budgets", {
-                            category_id: budget.category_id,
-                            month: targetMonthStr,
-                            amount: budget.budget_amount,
-                        }),
-                    );
+                rawBudgets.forEach((budget) => {
+                    if (!parentIds.has(budget.category_id)) {
+                        promises.push(
+                            apiClient.post("/budgets", {
+                                category_id: budget.category_id,
+                                month: targetMonthStr,
+                                amount: budget.budget_amount,
+                            }),
+                        );
+                    }
                 });
             }
 
@@ -155,7 +212,7 @@ export function AllocateBudgetDialog({
             onClose();
         } catch (error) {
             console.error("Failed to save budgets:", error);
-            alert("Failed to save some budgets. Please try again.");
+            alert("Failed to save budgets.");
         } finally {
             setSaving(false);
         }
@@ -163,145 +220,178 @@ export function AllocateBudgetDialog({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[600px] h-[80vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>Allocate Budgets</DialogTitle>
-                    <DialogDescription>
-                        Set budget targets for{" "}
-                        {month.toLocaleDateString("default", {
-                            month: "long",
-                            year: "numeric",
-                        })}
-                        .
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent className="sm:max-w-[650px] h-[85vh] flex flex-col p-0 overflow-hidden">
+                <div className="p-6 pb-0">
+                    <DialogHeader>
+                        <DialogTitle>Allocate Budgets</DialogTitle>
+                        <DialogDescription>
+                            Set targets for{" "}
+                            {month.toLocaleDateString("default", {
+                                month: "long",
+                                year: "numeric",
+                            })}
+                            . Parents auto-sum their children.
+                        </DialogDescription>
+                    </DialogHeader>
 
-                <div className="flex gap-2 py-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCopyPrior("budget")}
-                        disabled={loading}
-                    >
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copy Prior Budget
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCopyPrior("actual")}
-                        disabled={loading}
-                    >
-                        <History className="mr-2 h-4 w-4" />
-                        Copy Prior Actuals
-                    </Button>
-                </div>
-
-                <div className="flex-1 overflow-hidden min-h-0 py-4 border rounded-md">
-                    {loading ? (
-                        <div className="flex h-full items-center justify-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        </div>
-                    ) : (
-                        <ScrollArea className="h-full">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Category</TableHead>
-                                        <TableHead className="w-[150px] text-right">
-                                            Budget
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {budgets.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={2}
-                                                className="text-center text-muted-foreground"
-                                            >
-                                                No categories found.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        budgets.map((budget, index) => (
-                                            <TableRow key={budget.category_id}>
-                                                <TableCell className="font-medium">
-                                                    {budget.category_name}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.01"
-                                                        value={
-                                                            budget.budget_amount ||
-                                                            ""
-                                                        }
-                                                        onChange={(e) =>
-                                                            handleAmountChange(
-                                                                index,
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="0.00"
-                                                        className="text-right h-8"
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </ScrollArea>
-                    )}
-                </div>
-
-                <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
-                    <div className="flex items-center gap-2">
-                        <Label
-                            htmlFor="future-months"
-                            className="text-sm text-muted-foreground whitespace-nowrap"
+                    <div className="flex gap-2 py-4">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCopyPrior("budget")}
+                            disabled={loading}
                         >
-                            Also apply to next
-                        </Label>
-                        <Input
-                            id="future-months"
-                            type="number"
-                            min="0"
-                            max="12"
-                            className="w-16 h-8"
-                            value={futureMonths}
-                            onChange={(e) =>
-                                setFutureMonths(parseInt(e.target.value) || 0)
-                            }
-                        />
-                        <span className="text-sm text-muted-foreground">
-                            months
-                        </span>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={onClose}>
-                            Cancel
+                            <Copy className="mr-2 h-4 w-4" />
+                            Copy Prior Budget
                         </Button>
                         <Button
-                            onClick={handleSave}
-                            disabled={loading || saving}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCopyPrior("actual")}
+                            disabled={loading}
                         >
-                            {saving ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="mr-2 h-4 w-4" />
-                                    Save
-                                </>
-                            )}
+                            <History className="mr-2 h-4 w-4" />
+                            Copy Prior Actuals
                         </Button>
                     </div>
-                </DialogFooter>
+                </div>
+
+                <div className="flex-1 overflow-hidden px-6 pb-4">
+                    <div className="h-full border rounded-md overflow-hidden bg-background">
+                        {loading ? (
+                            <div className="flex h-full items-center justify-center">
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : (
+                            <ScrollArea className="h-full">
+                                <Table>
+                                    <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                                        <TableRow>
+                                            <TableHead>Category</TableHead>
+                                            <TableHead className="w-[150px] text-right">
+                                                Budget
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {tableData.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={2}
+                                                    className="text-center text-muted-foreground py-10"
+                                                >
+                                                    No categories found.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            tableData.map((budget) => (
+                                                <TableRow
+                                                    key={budget.category_id}
+                                                    className={cn(
+                                                        budget.isParent &&
+                                                            "bg-muted/30 font-semibold",
+                                                    )}
+                                                >
+                                                    <TableCell
+                                                        style={{
+                                                            paddingLeft: `${budget.depth * 1.5 + 0.75}rem`,
+                                                        }}
+                                                        className="py-2"
+                                                    >
+                                                        {budget.category_name}
+                                                    </TableCell>
+                                                    <TableCell className="py-1">
+                                                        <div className="flex justify-end items-center">
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.01"
+                                                                value={
+                                                                    budget.displayValue ===
+                                                                    0
+                                                                        ? ""
+                                                                        : budget.displayValue.toFixed(
+                                                                              2,
+                                                                          )
+                                                                }
+                                                                onChange={(e) =>
+                                                                    handleAmountChange(
+                                                                        budget.category_id,
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    budget.isParent
+                                                                }
+                                                                placeholder="0.00"
+                                                                className={cn(
+                                                                    "text-right h-8 w-28",
+                                                                    budget.isParent &&
+                                                                        "bg-transparent border-transparent shadow-none font-bold text-foreground opacity-100",
+                                                                )}
+                                                            />
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        )}
+                    </div>
+                </div>
+
+                <div className="p-6 pt-0">
+                    <DialogFooter className="flex flex-row items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                            <Label
+                                htmlFor="future-months"
+                                className="text-sm text-muted-foreground whitespace-nowrap"
+                            >
+                                Repeat for next
+                            </Label>
+                            <Input
+                                id="future-months"
+                                type="number"
+                                min="0"
+                                max="12"
+                                className="w-16 h-8"
+                                value={futureMonths}
+                                onChange={(e) =>
+                                    setFutureMonths(
+                                        parseInt(e.target.value) || 0,
+                                    )
+                                }
+                            />
+                            <span className="text-sm text-muted-foreground">
+                                months
+                            </span>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={onClose}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleSave}
+                                disabled={loading || saving}
+                            >
+                                {saving ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="mr-2 h-4 w-4" />
+                                        Save
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </DialogFooter>
+                </div>
             </DialogContent>
         </Dialog>
     );

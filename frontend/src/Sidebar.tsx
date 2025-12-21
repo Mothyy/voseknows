@@ -28,7 +28,7 @@ type NavItem = {
 // Helper to get the Lucide icon component from its string name
 const getIcon = (name: keyof typeof icons) => {
     const Icon = icons[name] as React.ElementType;
-    return Icon ? <Icon className="h-5 w-5" /> : null;
+    return Icon ? <Icon className="h-5 w-5 shrink-0" /> : null;
 };
 
 export const Sidebar = () => {
@@ -57,26 +57,31 @@ export const Sidebar = () => {
         <div
             className={cn(
                 "relative flex h-screen flex-col border-r bg-background transition-all duration-300 ease-in-out",
-                isCollapsed ? "w-20" : "w-64",
+                isCollapsed ? "w-16" : "w-64",
             )}
         >
             {/* Sidebar Header */}
-            <div className="flex h-16 items-center border-b p-4">
+            <div className="flex h-16 items-center border-b px-4">
                 <div
                     className={cn(
-                        "flex items-center gap-2 overflow-hidden",
-                        isCollapsed && "w-0",
+                        "flex items-center gap-2 overflow-hidden transition-all duration-300",
+                        isCollapsed ? "w-8 justify-center" : "w-auto",
                     )}
                 >
-                    <icons.HandCoins className="h-8 w-8 text-primary" />
-                    <h1 className="whitespace-nowrap text-lg font-bold">
+                    <icons.HandCoins className="h-8 w-8 shrink-0 text-primary" />
+                    <h1
+                        className={cn(
+                            "whitespace-nowrap text-lg font-bold transition-opacity duration-300",
+                            isCollapsed ? "opacity-0 w-0" : "opacity-100",
+                        )}
+                    >
                         VoseKnows
                     </h1>
                 </div>
             </div>
 
             {/* Navigation */}
-            <nav className="flex-grow overflow-y-auto overflow-x-hidden px-4 py-4">
+            <nav className="flex-grow overflow-y-auto overflow-x-hidden px-3 py-4">
                 <Accordion
                     type="single"
                     collapsible
@@ -92,11 +97,18 @@ export const Sidebar = () => {
                             >
                                 <AccordionTrigger
                                     className={cn(
-                                        "flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:no-underline",
-                                        isCollapsed && "justify-center",
+                                        "flex w-full items-center rounded-md py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:no-underline transition-all duration-300",
+                                        isCollapsed
+                                            ? "justify-center px-0 [&>svg]:hidden"
+                                            : "justify-between px-3",
                                     )}
                                 >
-                                    <div className="flex items-center gap-3">
+                                    <div
+                                        className={cn(
+                                            "flex items-center",
+                                            !isCollapsed && "gap-3",
+                                        )}
+                                    >
                                         {getIcon(item.icon)}
                                         {!isCollapsed && (
                                             <span className="truncate">
@@ -112,11 +124,12 @@ export const Sidebar = () => {
                                             to={child.path}
                                             className={({ isActive }) =>
                                                 cn(
-                                                    "mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                                                    "mt-1 flex items-center rounded-md py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
                                                     isActive &&
                                                         "bg-accent text-accent-foreground",
-                                                    isCollapsed &&
-                                                        "justify-center",
+                                                    isCollapsed
+                                                        ? "justify-center px-0"
+                                                        : "gap-3 px-3",
                                                 )
                                             }
                                         >
@@ -136,10 +149,12 @@ export const Sidebar = () => {
                                 to={item.path!}
                                 className={({ isActive }) =>
                                     cn(
-                                        "mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                                        "mt-1 flex items-center rounded-md py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
                                         isActive &&
                                             "bg-accent text-accent-foreground",
-                                        isCollapsed && "justify-center",
+                                        isCollapsed
+                                            ? "justify-center px-0"
+                                            : "gap-3 px-3",
                                     )
                                 }
                             >
@@ -156,17 +171,17 @@ export const Sidebar = () => {
             </nav>
 
             {/* Collapse Toggle Button */}
-            <div className="mt-auto border-t p-4">
+            <div className="mt-auto border-t p-2">
                 <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    className="w-full"
+                    className="w-full h-10"
                     onClick={toggleSidebar}
                 >
                     {isCollapsed ? (
-                        <icons.ChevronRight className="h-4 w-4" />
+                        <icons.ChevronRight className="h-5 w-5 text-muted-foreground" />
                     ) : (
-                        <icons.ChevronLeft className="h-4 w-4" />
+                        <icons.ChevronLeft className="h-5 w-5 text-muted-foreground" />
                     )}
                 </Button>
             </div>
