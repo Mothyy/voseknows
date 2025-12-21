@@ -39,6 +39,7 @@ interface DataTableProps<TData, TValue> {
     data: TData[];
     filterColumnId?: string;
     refreshData?: () => void;
+    categories?: any[];
     rowSelection?: RowSelectionState;
     onRowSelectionChange?: OnChangeFn<RowSelectionState>;
     onSearch?: (value: string) => void;
@@ -53,6 +54,7 @@ export function DataTable<TData, TValue>({
     data,
     filterColumnId,
     refreshData,
+    categories,
     rowSelection = {},
     onRowSelectionChange,
     onSearch,
@@ -86,6 +88,7 @@ export function DataTable<TData, TValue>({
         getSortedRowModel: getSortedRowModel(),
         meta: {
             refreshData,
+            categories,
         },
     });
 

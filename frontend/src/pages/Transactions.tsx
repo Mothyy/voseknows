@@ -235,6 +235,7 @@ const TransactionsPage: React.FC = () => {
                 data={data}
                 filterColumnId="description"
                 refreshData={() => fetchTransactions(true, 1)}
+                categories={categories}
                 onSearch={setSearchQuery}
                 onLoadMore={handleLoadMore}
                 hasMore={hasMore}

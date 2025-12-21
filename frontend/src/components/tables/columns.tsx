@@ -34,27 +34,12 @@ const TransactionActions: React.FC<{
     table: Table<Transaction>;
 }> = ({ row, table }) => {
     const transaction = row.original;
-    const [categories, setCategories] = React.useState<Category[]>([]);
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
-    // The refresh function is passed via the table's `meta` property.
-    const refreshData = (table.options.meta as any)?.refreshData;
-
-    // Fetch categories once when the component mounts.
-    React.useEffect(() => {
-        const fetchCategories = async () => {
-            try {
-                const response = await apiClient.get<Category[]>("/categories");
-                setCategories(response.data);
-            } catch (error) {
-                console.error(
-                    "Failed to fetch categories for dropdown:",
-                    error,
-                );
-            }
-        };
-        fetchCategories();
-    }, []);
+    // Use the data passed through the table's meta to avoid redundant API calls
+    const meta = table.options.meta as any;
+    const categories = meta?.categories || [];
+    const refreshData = meta?.refreshData;
 
     const handleSetCategory = async (categoryId: string | null) => {
         try {
