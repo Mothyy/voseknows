@@ -20,10 +20,14 @@ router.post(
 
             const fileContent = req.file.buffer.toString("utf8");
             const accountId = req.body.accountId;
-            const result = await importService.importOfx(
-                fileContent,
-                accountId,
-            );
+            const format = req.body.format || "ofx";
+
+            let result;
+            if (format.toLowerCase() === "qif") {
+                result = await importService.importQif(fileContent, accountId);
+            } else {
+                result = await importService.importOfx(fileContent, accountId);
+            }
 
             res.json({
                 message: "Import processed successfully",

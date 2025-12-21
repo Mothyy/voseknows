@@ -163,9 +163,7 @@ export function ImportTransactionsDialog({
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="ofx">OFX / QFX</SelectItem>
-                                <SelectItem value="qif" disabled>
-                                    QIF (Coming Soon)
-                                </SelectItem>
+                                <SelectItem value="qif">QIF</SelectItem>
                                 <SelectItem value="csv" disabled>
                                     CSV (Coming Soon)
                                 </SelectItem>
@@ -179,7 +177,13 @@ export function ImportTransactionsDialog({
                         <Input
                             id="file"
                             type="file"
-                            accept={format === "ofx" ? ".ofx,.qfx" : "*"}
+                            accept={
+                                format === "ofx"
+                                    ? ".ofx,.qfx"
+                                    : format === "qif"
+                                      ? ".qif"
+                                      : "*"
+                            }
                             className="col-span-3"
                             onChange={handleFileChange}
                         />
