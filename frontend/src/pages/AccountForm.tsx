@@ -38,7 +38,7 @@ const formSchema = z.object({
     name: z.string().min(2, {
         message: "Account name must be at least 2 characters.",
     }),
-    type: z.enum(["checking", "savings", "credit"], {
+    type: z.enum(["checking", "savings", "credit", "loan"], {
         required_error: "Please select an account type.",
     }),
     balance: z.coerce.number().default(0),
@@ -78,7 +78,11 @@ const AccountForm: React.FC<AccountFormProps> = ({
         if (isEditMode && account) {
             form.reset({
                 name: account.name,
-                type: account.type as "checking" | "savings" | "credit",
+                type: account.type as
+                    | "checking"
+                    | "savings"
+                    | "credit"
+                    | "loan",
                 balance: account.starting_balance,
                 include_in_budget: account.include_in_budget,
             });
@@ -170,6 +174,9 @@ const AccountForm: React.FC<AccountFormProps> = ({
                                             </SelectItem>
                                             <SelectItem value="credit">
                                                 Credit
+                                            </SelectItem>
+                                            <SelectItem value="loan">
+                                                Loan
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>

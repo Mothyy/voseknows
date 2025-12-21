@@ -6,9 +6,13 @@ import {
     CreditCard,
     PiggyBank,
     ShieldCheck,
+    ShieldOff,
+    Banknote,
     MoreVertical,
     Edit,
     Trash,
+    List,
+    ArrowRight,
 } from "lucide-react";
 import apiClient from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -29,7 +33,7 @@ import { cn } from "@/lib/utils";
 export type Account = {
     id: string;
     name: string;
-    type: "checking" | "savings" | "credit" | string; // Allow for other types
+    type: "checking" | "savings" | "credit" | "loan" | string; // Allow for other types
     balance: number;
     starting_balance: number;
     include_in_budget: boolean;
@@ -52,6 +56,8 @@ const getAccountIcon = (type: Account["type"]) => {
             return <PiggyBank className="h-6 w-6 text-muted-foreground" />;
         case "credit":
             return <CreditCard className="h-6 w-6 text-muted-foreground" />;
+        case "loan":
+            return <Banknote className="h-6 w-6 text-muted-foreground" />;
         default:
             return <Landmark className="h-6 w-6 text-muted-foreground" />;
     }
@@ -172,6 +178,14 @@ const AccountsPage: React.FC = () => {
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
+                                    <DropdownMenuItem asChild>
+                                        <Link
+                                            to={`/transactions?accountId=${account.id}`}
+                                        >
+                                            <List className="mr-2 h-4 w-4" />{" "}
+                                            View Transactions
+                                        </Link>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem
                                         onClick={() => handleEdit(account)}
                                     >
@@ -197,8 +211,8 @@ const AccountsPage: React.FC = () => {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </CardHeader>
-                        <Link to={`/accounts/${account.id}`}>
-                            <CardContent>
+                        <CardContent>
+                            <Link to={`/accounts/${account.id}`}>
                                 <div
                                     className={cn(
                                         "text-3xl font-bold",
@@ -212,14 +226,42 @@ const AccountsPage: React.FC = () => {
                                 <p className="text-xs capitalize text-muted-foreground">
                                     {account.type} Account
                                 </p>
-                                {account.include_in_budget && (
-                                    <div className="mt-4 flex items-center text-xs text-muted-foreground">
-                                        <ShieldCheck className="mr-1 h-4 w-4 text-green-500" />
-                                        <span>Included in budget</span>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Link>
+                                <div className="mt-4 flex items-center text-xs text-muted-foreground">
+                                    {account.include_in_budget ? (
+                                        <>
+                                            <ShieldCheck className="mr-1 h-4 w-4 text-green-500" />
+                                            <span>Included in budget</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ShieldOff className="mr-1 h-4 w-4 text-red-500" />
+                                            <span>Excluded from budget</span>
+                                        </>
+                                    )}
+                                </div>
+                            </Link>
+                            <div className="mt-6 pt-4 border-t flex justify-between items-center gap-2">
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1"
+                                >
+                                    <Link
+                                        to={`/transactions?accountId=${account.id}`}
+                                    >
+                                        <List className="mr-2 h-4 w-4" />
+                                        Transactions
+                                    </Link>
+                                </Button>
+                                <Button asChild variant="ghost" size="sm">
+                                    <Link to={`/accounts/${account.id}`}>
+                                        Details
+                                        <ArrowRight className="ml-2 h-4 w-4" />
+                                    </Link>
+                                </Button>
+                            </div>
+                        </CardContent>
                     </Card>
                 ))}
             </div>

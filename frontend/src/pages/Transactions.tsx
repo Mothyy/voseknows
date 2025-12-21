@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DataTable } from "@/components/tables/data-table";
 import { columns } from "@/components/tables/columns";
 import { Transaction } from "@/data/transactions";
@@ -28,12 +29,16 @@ interface TransactionResponse {
 }
 
 const TransactionsPage: React.FC = () => {
+    const [searchParams] = useSearchParams();
+    const initialAccountId = searchParams.get("accountId") || "all";
+
     const [data, setData] = useState<Transaction[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
 
     // Filters and Search
-    const [selectedAccountId, setSelectedAccountId] = useState<string>("all");
+    const [selectedAccountId, setSelectedAccountId] =
+        useState<string>(initialAccountId);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
     const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -45,6 +50,14 @@ const TransactionsPage: React.FC = () => {
 
     // Bulk Actions
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+    // Sync URL parameters to state for deep linking
+    useEffect(() => {
+        const accountId = searchParams.get("accountId") || "all";
+        if (accountId !== selectedAccountId) {
+            setSelectedAccountId(accountId);
+        }
+    }, [searchParams, selectedAccountId]);
     const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
     const abortControllerRef = useRef<AbortController | null>(null);
 
