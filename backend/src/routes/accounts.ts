@@ -229,6 +229,60 @@ router.delete("/:id/transactions", async (req: Request, res: Response) => {
 });
 
 /**
+ * @route   GET /api/accounts/:id/category-summary
+ * @desc    Get expenditure summary by category for an account
+ * @access  Public
+ */
+router.get("/:id/category-summary", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const sql = `
+            SELECT
+                COALESCE(c.name, 'Uncategorized') as name,
+                ABS(SUM(t.amount))::numeric(15, 2) as value
+            FROM transactions t
+            LEFT JOIN categories c ON t.category_id = c.id
+            WHERE t.account_id = $1 AND t.amount < 0
+            GROUP BY c.name
+            ORDER BY value DESC;
+        `;
+        const { rows } = await query(sql, [id]);
+        res.json(rows);
+    } catch (err: any) {
+        console.error(
+            `Error fetching category summary for account ${id}:`,
+            err,
+        );
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+/**
+ * @route   GET /api/accounts/:id/history
+ * @desc    Get daily expenditure history for an account
+ * @access  Public
+ */
+router.get("/:id/history", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const sql = `
+            SELECT
+                date,
+                ABS(SUM(amount))::numeric(15, 2) as amount
+            FROM transactions
+            WHERE account_id = $1 AND amount < 0
+            GROUP BY date
+            ORDER BY date ASC;
+        `;
+        const { rows } = await query(sql, [id]);
+        res.json(rows);
+    } catch (err: any) {
+        console.error(`Error fetching history for account ${id}:`, err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+/**
  * @route   DELETE /api/accounts/:id
  * @desc    Delete an account
  * @access  Public
