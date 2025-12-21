@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import apiClient from "@/lib/api";
 import { Account } from "./Accounts"; // Reuse the Account type
 import { Transaction } from "@/data/transactions"; // Reuse the Transaction type
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -28,6 +28,33 @@ const AccountDetailPage: React.FC = () => {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const handleDeleteTransactions = async () => {
+        if (!id) return;
+        if (
+            window.confirm(
+                "Are you sure you want to delete ALL transactions for this account? This cannot be undone.",
+            )
+        ) {
+            try {
+                await apiClient.delete(`/accounts/${id}/transactions`);
+                // Refresh data
+                const [accountResponse, transactionsResponse] =
+                    await Promise.all([
+                        apiClient.get<Account>(`/accounts/${id}`),
+                        // Fetch the 5 most recent transactions for this account
+                        apiClient.get<Transaction[]>(
+                            `/accounts/${id}/transactions?limit=5`,
+                        ),
+                    ]);
+                setAccount(accountResponse.data);
+                setTransactions(transactionsResponse.data);
+            } catch (err) {
+                console.error("Failed to delete transactions:", err);
+                alert("Failed to delete transactions.");
+            }
+        }
+    };
 
     useEffect(() => {
         const fetchAccountDetails = async () => {
@@ -98,21 +125,33 @@ const AccountDetailPage: React.FC = () => {
                         Back to Accounts
                     </Link>
                 </Button>
-                <h1 className="text-3xl font-bold tracking-tight">
-                    {account.name}
-                </h1>
-                <p className="text-muted-foreground capitalize">
-                    {account.type} Account
-                </p>
-                <div
-                    className={cn(
-                        "mt-2 text-4xl font-bold tracking-tight",
-                        account.balance >= 0
-                            ? "text-green-600"
-                            : "text-red-600",
-                    )}
-                >
-                    {formatCurrency(account.balance)}
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">
+                            {account.name}
+                        </h1>
+                        <p className="text-muted-foreground capitalize">
+                            {account.type} Account
+                        </p>
+                        <div
+                            className={cn(
+                                "mt-2 text-4xl font-bold tracking-tight",
+                                account.balance >= 0
+                                    ? "text-green-600"
+                                    : "text-red-600",
+                            )}
+                        >
+                            {formatCurrency(account.balance)}
+                        </div>
+                    </div>
+                    <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleDeleteTransactions}
+                    >
+                        <Trash className="mr-2 h-4 w-4" />
+                        Delete All Transactions
+                    </Button>
                 </div>
             </div>
 

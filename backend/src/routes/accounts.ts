@@ -207,6 +207,28 @@ router.patch("/:id", async (req: Request, res: Response) => {
 });
 
 /**
+ * @route   DELETE /api/accounts/:id/transactions
+ * @desc    Delete all transactions for a specific account
+ * @access  Public
+ */
+router.delete("/:id/transactions", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const { rowCount } = await query(
+            "DELETE FROM transactions WHERE account_id = $1",
+            [id],
+        );
+        res.json({
+            message: `Successfully deleted ${rowCount} transactions.`,
+            deletedCount: rowCount,
+        });
+    } catch (err: any) {
+        console.error(`Error deleting transactions for account ${id}:`, err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+/**
  * @route   DELETE /api/accounts/:id
  * @desc    Delete an account
  * @access  Public

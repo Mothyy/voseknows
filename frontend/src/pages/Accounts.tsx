@@ -19,6 +19,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,6 +69,22 @@ const AccountsPage: React.FC = () => {
     const handleEdit = (account: Account) => {
         setSelectedAccount(account);
         setIsFormOpen(true);
+    };
+
+    const handleDeleteTransactions = async (id: string) => {
+        if (
+            window.confirm(
+                "Are you sure you want to delete ALL transactions for this account? This cannot be undone.",
+            )
+        ) {
+            try {
+                await apiClient.delete(`/accounts/${id}/transactions`);
+                fetchAccounts();
+            } catch (err) {
+                console.error("Failed to delete transactions:", err);
+                alert("Failed to delete transactions.");
+            }
+        }
     };
 
     const handleDelete = async (id: string) => {
@@ -161,11 +178,21 @@ const AccountsPage: React.FC = () => {
                                         <Edit className="mr-2 h-4 w-4" /> Edit
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
+                                        onClick={() =>
+                                            handleDeleteTransactions(account.id)
+                                        }
+                                        className="text-red-600"
+                                    >
+                                        <Trash className="mr-2 h-4 w-4" />{" "}
+                                        Delete Transactions
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
                                         onClick={() => handleDelete(account.id)}
                                         className="text-red-600"
                                     >
                                         <Trash className="mr-2 h-4 w-4" />{" "}
-                                        Delete
+                                        Delete Account
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
