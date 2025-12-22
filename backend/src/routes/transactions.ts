@@ -63,6 +63,16 @@ router.get("/", async (req: Request, res: Response) => {
         const total = parseInt(countResult.rows[0].total);
 
         const sql = `
+            WITH balance_calc AS (
+                SELECT
+                    t.*,
+                    (a.starting_balance + SUM(t.amount) OVER (
+                        PARTITION BY t.account_id
+                        ORDER BY t.date ASC, t.created_at ASC
+                    ))::numeric(15, 2) as balance
+                FROM transactions t
+                JOIN accounts a ON t.account_id = a.id
+            )
             SELECT
                 t.id,
                 t.date,
@@ -72,8 +82,9 @@ router.get("/", async (req: Request, res: Response) => {
                 a.name as account,
                 c.name as category,
                 t.category_id,
-                t.account_id
-            FROM transactions t
+                t.account_id,
+                t.balance
+            FROM balance_calc t
             JOIN accounts a ON t.account_id = a.id
             LEFT JOIN categories c ON t.category_id = c.id
             ${whereSQL}

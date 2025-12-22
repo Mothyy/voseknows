@@ -181,6 +181,30 @@ export const columns: ColumnDef<Transaction>[] = [
         },
     },
     {
+        accessorKey: "balance",
+        header: () => <div className="text-right">Balance</div>,
+        cell: ({ row }) => {
+            const val = row.getValue("balance");
+            const balance =
+                typeof val === "string" ? parseFloat(val) : Number(val);
+            const formatted = new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD",
+            }).format(balance);
+
+            return (
+                <div
+                    className={cn(
+                        "text-right font-medium",
+                        balance >= 0 ? "text-green-600" : "text-red-600",
+                    )}
+                >
+                    {formatted}
+                </div>
+            );
+        },
+    },
+    {
         accessorKey: "category",
         header: "Category",
         cell: ({ row }) => {

@@ -3,6 +3,7 @@ export type Transaction = {
     date: string;
     description: string;
     amount: number | string;
+    balance: number | string;
     status: "pending" | "cleared" | "failed";
     account: string;
     category: string | null;
