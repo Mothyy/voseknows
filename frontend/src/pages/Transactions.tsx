@@ -260,7 +260,7 @@ const TransactionsPage: React.FC = () => {
     };
 
     return (
-        <div className="container mx-auto py-10 px-4">
+        <div>
             <div className="flex flex-col gap-4 mb-6">
                 <div className="flex justify-between items-center">
                     <div>

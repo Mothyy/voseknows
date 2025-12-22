@@ -180,7 +180,7 @@ const AccountDetailPage: React.FC = () => {
 
     if (error || !account) {
         return (
-            <div className="container mx-auto py-10 px-4">
+            <div>
                 <Button asChild variant="outline" className="mb-4">
                     <Link to="/accounts">
                         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -197,7 +197,7 @@ const AccountDetailPage: React.FC = () => {
     }
 
     return (
-        <div className="container mx-auto py-10 px-4">
+        <div>
             <div className="mb-6">
                 <Button asChild variant="outline" className="mb-4">
                     <Link to="/accounts">
