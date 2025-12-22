@@ -29,7 +29,7 @@ interface TransactionResponse {
 }
 
 const TransactionsPage: React.FC = () => {
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const initialAccountId = searchParams.get("accountId") || "all";
 
     const [data, setData] = useState<Transaction[]>([]);
@@ -54,10 +54,19 @@ const TransactionsPage: React.FC = () => {
     // Sync URL parameters to state for deep linking
     useEffect(() => {
         const accountId = searchParams.get("accountId") || "all";
-        if (accountId !== selectedAccountId) {
-            setSelectedAccountId(accountId);
+        setSelectedAccountId(accountId);
+    }, [searchParams]);
+
+    const handleAccountChange = (value: string) => {
+        setSelectedAccountId(value);
+        const newParams = new URLSearchParams(searchParams);
+        if (value === "all") {
+            newParams.delete("accountId");
+        } else {
+            newParams.set("accountId", value);
         }
-    }, [searchParams, selectedAccountId]);
+        setSearchParams(newParams);
+    };
     const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
     const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -282,7 +291,7 @@ const TransactionsPage: React.FC = () => {
                     <div className="flex gap-2">
                         <Select
                             value={selectedAccountId}
-                            onValueChange={setSelectedAccountId}
+                            onValueChange={handleAccountChange}
                         >
                             <SelectTrigger className="w-[200px]">
                                 <SelectValue placeholder="Filter by Account" />
