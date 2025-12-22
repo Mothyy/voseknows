@@ -31,6 +31,7 @@ interface TransactionResponse {
 const TransactionsPage: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const initialAccountId = searchParams.get("accountId") || "all";
+    const initialCategoryId = searchParams.get("categoryId") || "all";
 
     const [data, setData] = useState<Transaction[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
@@ -39,7 +40,8 @@ const TransactionsPage: React.FC = () => {
     // Filters and Search
     const [selectedAccountId, setSelectedAccountId] =
         useState<string>(initialAccountId);
-    const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+    const [selectedCategoryId, setSelectedCategoryId] =
+        useState<string>(initialCategoryId);
     const [searchQuery, setSearchQuery] = useState<string>("");
 
     // Pagination
@@ -54,16 +56,27 @@ const TransactionsPage: React.FC = () => {
     // Sync URL parameters to state for deep linking
     useEffect(() => {
         const accountId = searchParams.get("accountId") || "all";
+        const categoryId = searchParams.get("categoryId") || "all";
         setSelectedAccountId(accountId);
+        setSelectedCategoryId(categoryId);
     }, [searchParams]);
 
     const handleAccountChange = (value: string) => {
-        setSelectedAccountId(value);
         const newParams = new URLSearchParams(searchParams);
         if (value === "all") {
             newParams.delete("accountId");
         } else {
             newParams.set("accountId", value);
+        }
+        setSearchParams(newParams);
+    };
+
+    const handleCategoryChange = (value: string) => {
+        const newParams = new URLSearchParams(searchParams);
+        if (value === "all") {
+            newParams.delete("categoryId");
+        } else {
+            newParams.set("categoryId", value);
         }
         setSearchParams(newParams);
     };
@@ -170,6 +183,7 @@ const TransactionsPage: React.FC = () => {
                     apiClient.get<Account[]>("/accounts"),
                     apiClient.get<Category[]>("/categories"),
                 ]);
+
                 setAccounts(Array.isArray(accRes.data) ? accRes.data : []);
                 setCategories(Array.isArray(catRes.data) ? catRes.data : []);
             } catch (err) {
@@ -243,6 +257,27 @@ const TransactionsPage: React.FC = () => {
         }
     };
 
+    const flatCategories = React.useMemo(() => {
+        const flatten = (nodes: Category[], depth = 0): any[] => {
+            let flat: any[] = [];
+            nodes.forEach((node) => {
+                flat.push({
+                    id: node.id,
+                    name: node.name,
+                    displayName:
+                        "\u00A0\u00A0".repeat(depth * 2) +
+                        (depth > 0 ? "↳ " : "") +
+                        node.name,
+                });
+                if (node.children && node.children.length > 0) {
+                    flat.push(...flatten(node.children, depth + 1));
+                }
+            });
+            return flat;
+        };
+        return flatten(categories);
+    }, [categories]);
+
     const renderContent = () => {
         if (error) {
             return (
@@ -314,7 +349,7 @@ const TransactionsPage: React.FC = () => {
 
                         <Select
                             value={selectedCategoryId}
-                            onValueChange={setSelectedCategoryId}
+                            onValueChange={handleCategoryChange}
                         >
                             <SelectTrigger className="w-[200px]">
                                 <SelectValue placeholder="Filter by Category" />
@@ -326,12 +361,12 @@ const TransactionsPage: React.FC = () => {
                                 <SelectItem value="uncategorized">
                                     Uncategorized
                                 </SelectItem>
-                                {categories.map((category) => (
+                                {flatCategories.map((category: any) => (
                                     <SelectItem
                                         key={category.id}
                                         value={category.id}
                                     >
-                                        {category.name}
+                                        {category.displayName}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

@@ -41,7 +41,15 @@ router.get("/", async (req: Request, res: Response) => {
                 whereClauses.push(`t.category_id IS NULL`);
             } else if (categoryId !== "all") {
                 params.push(categoryId);
-                whereClauses.push(`t.category_id = $${params.length}`);
+                whereClauses.push(`t.category_id IN (
+                    WITH RECURSIVE category_tree AS (
+                        SELECT id FROM categories WHERE id = $${params.length}
+                        UNION ALL
+                        SELECT c.id FROM categories c
+                        JOIN category_tree ct ON c.parent_id = ct.id
+                    )
+                    SELECT id FROM category_tree
+                )`);
             }
         }
 
