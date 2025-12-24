@@ -109,6 +109,7 @@ class ImportService {
     async importQif(
         qifData: string,
         targetAccountId?: string,
+        dateFormat: string = "MM/DD/YYYY",
     ): Promise<ImportResult> {
         const result: ImportResult = { accounts: [] };
 
@@ -198,7 +199,7 @@ class ImportService {
 
             switch (code) {
                 case "D": // Date
-                    currentTxn.date = this.parseQifDate(value);
+                    currentTxn.date = this.parseQifDate(value, dateFormat);
                     break;
                 case "T": // Amount
                     currentTxn.amount = parseFloat(value.replace(/,/g, ""));
@@ -256,16 +257,23 @@ class ImportService {
         return result;
     }
 
-    private parseQifDate(qifDate: string): string {
-        const parts = qifDate.split(/[/'-]/);
+    private parseQifDate(qifDate: string, format: string): string {
+        const parts = qifDate.replace(/ /g, "").split(/[/'-]/);
         if (parts.length === 3) {
-            let month = parts[0].padStart(2, "0");
-            let day = parts[1].padStart(2, "0");
-            let year = parts[2];
+            let month, day, year;
+            if (format === "DD/MM/YYYY") {
+                [day, month, year] = parts;
+            } else if (format === "YYYY-MM-DD") {
+                [year, month, day] = parts;
+            } else {
+                // Default to MM/DD/YYYY
+                [month, day, year] = parts;
+            }
+
             if (year.length === 2) {
                 year = parseInt(year) > 70 ? `19${year}` : `20${year}`;
             }
-            return `${year}-${month}-${day}`;
+            return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
         }
         return qifDate;
     }

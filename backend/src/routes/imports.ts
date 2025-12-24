@@ -21,10 +21,15 @@ router.post(
             const fileContent = req.file.buffer.toString("utf8");
             const accountId = req.body.accountId;
             const format = req.body.format || "ofx";
+            const dateFormat = req.body.dateFormat;
 
             let result;
             if (format.toLowerCase() === "qif") {
-                result = await importService.importQif(fileContent, accountId);
+                result = await importService.importQif(
+                    fileContent,
+                    accountId,
+                    dateFormat,
+                );
             } else {
                 result = await importService.importOfx(fileContent, accountId);
             }

@@ -32,6 +32,7 @@ export function ImportTransactionsDialog({
     const [open, setOpen] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [format, setFormat] = useState<string>("ofx");
+    const [dateFormat, setDateFormat] = useState<string>("MM/DD/YYYY");
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [selectedAccountId, setSelectedAccountId] = useState<string>("auto");
     const [uploading, setUploading] = useState(false);
@@ -74,6 +75,7 @@ export function ImportTransactionsDialog({
         const formData = new FormData();
         formData.append("file", file);
         formData.append("format", format);
+        formData.append("dateFormat", dateFormat);
         if (selectedAccountId && selectedAccountId !== "auto") {
             formData.append("accountId", selectedAccountId);
         }
@@ -170,6 +172,32 @@ export function ImportTransactionsDialog({
                             </SelectContent>
                         </Select>
                     </div>
+                    {format === "qif" && (
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="dateFormat" className="text-right">
+                                Date Format
+                            </Label>
+                            <Select
+                                value={dateFormat}
+                                onValueChange={setDateFormat}
+                            >
+                                <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Select date format" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="MM/DD/YYYY">
+                                        MM/DD/YYYY (US)
+                                    </SelectItem>
+                                    <SelectItem value="DD/MM/YYYY">
+                                        DD/MM/YYYY (UK/AU)
+                                    </SelectItem>
+                                    <SelectItem value="YYYY-MM-DD">
+                                        YYYY-MM-DD (ISO)
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="file" className="text-right">
                             File
