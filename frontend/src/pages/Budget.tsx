@@ -1,11 +1,9 @@
 import React, { useState } from "react";
-import { AllocateBudgetDialog } from "@/components/allocate-budget-dialog";
 import { BudgetSummary } from "@/components/budget-summary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-    Wallet,
     ChevronLeft,
     ChevronRight,
 } from "lucide-react";
@@ -22,11 +20,12 @@ const BudgetPage: React.FC = () => {
         startOfMonth(new Date()),
     );
 
-    // State for allocation dialog
-    const [isAllocateOpen, setIsAllocateOpen] = useState(false);
-
     // Key to force refresh summary component
     const [refreshKey, setRefreshKey] = useState(0);
+
+    const handleRefresh = () => {
+        setRefreshKey((prev: number) => prev + 1);
+    };
 
     const handlePrevMonth = () => {
         setSelectedDate((prev: Date) => subMonths(prev, 1));
@@ -43,10 +42,6 @@ const BudgetPage: React.FC = () => {
         if (!isNaN(date.getTime())) {
             setSelectedDate(date);
         }
-    };
-
-    const handleAllocateSuccess = () => {
-        setRefreshKey((prev: number) => prev + 1);
     };
 
     return (
@@ -119,32 +114,17 @@ const BudgetPage: React.FC = () => {
                             <ChevronRight className="h-5 w-5" />
                         </Button>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                        <Button
-                            onClick={() => setIsAllocateOpen(true)}
-                            className="bg-primary hover:bg-primary/90"
-                        >
-                            <Wallet className="mr-2 h-4 w-4" />
-                            Allocate Budgets
-                        </Button>
-                    </div>
                 </div>
             </div>
 
-            <div key={`${selectedDate.getTime()}-${refreshKey}`}>
-                <BudgetSummary startDate={selectedDate} />
+            <div key={`budget-summary-${refreshKey}`}>
+                <BudgetSummary
+                    startDate={selectedDate}
+                    onRefresh={handleRefresh}
+                />
             </div>
-
-            <AllocateBudgetDialog
-                isOpen={isAllocateOpen}
-                onClose={() => setIsAllocateOpen(false)}
-                month={selectedDate}
-                onSuccess={handleAllocateSuccess}
-            />
         </div>
     );
 };
 
 export default BudgetPage;
-
