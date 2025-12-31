@@ -181,7 +181,7 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                     });
                 } else {
                     const [mtdRes, ytdRes] = await Promise.all([
-                        viewMode === "mtd"
+                        (viewMode === "mtd" || viewMode === "ytd")
                             ? apiClient.get<BudgetRecord[]>(`/reports/budget-variance?startDate=${mtdStart}&endDate=${mtdEnd}`)
                             : Promise.resolve({ data: [] }),
                         viewMode === "ytd"
@@ -724,7 +724,7 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                         </>
                                     ) : (
                                         <>
-                                            {(viewMode === "mtd") && (
+                                            {(viewMode === "mtd" || viewMode === "ytd") && (
                                                 <>
                                                     <TableHead className="text-right">
                                                         Budget
@@ -828,7 +828,7 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                                 </>
                                             ) : (
                                                 <>
-                                                    {(viewMode === "mtd") && (
+                                                    {(viewMode === "mtd" || viewMode === "ytd") && (
                                                         <>
                                                             <TableCell className="text-right">
                                                                 {formatCurrency(item.mtd_budget)}
