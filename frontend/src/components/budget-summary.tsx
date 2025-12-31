@@ -78,7 +78,7 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
 
     // Inline Editing State
     const [isEditing, setIsEditing] = useState(false);
-    const [editedBudgets, setEditedBudgets] = useState<Record<string, number>>({});
+    const [editedBudgets, setEditedBudgets] = useState<Record<string, Record<string, number>>>({}); // categoryId -> monthKey -> amount
 
     useEffect(() => {
         const fetchData = async () => {
@@ -134,18 +134,33 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                 });
 
                 if (isEditing) {
-                    const currentMonthStart = format(startOfMonth(startDate), "yyyy-MM-dd");
-                    const budgetRes = await apiClient.get<any[]>(`/budgets?month=${currentMonthStart}`);
-                    const budgetMap = new Map(budgetRes.data.map((b: any) => [b.category_id, b.budget_amount]));
+                    const res = await apiClient.get<any[]>(
+                        `/reports/monthly-comparison?startDate=${mtdStart}&endDate=${mtdEnd}`
+                    );
 
-                    mergedMap.forEach((m, id) => {
-                        m.mtd_budget = Number(budgetMap.get(id) || 0);
+                    const initialEdited: Record<string, Record<string, number>> = {};
+
+                    res.data.forEach((row: any) => {
+                        const m = mergedMap.get(row.category_id);
+                        if (m) {
+                            const monthKey = row.month.split("T")[0];
+                            if (!m.monthlyData) m.monthlyData = {};
+                            m.monthlyData[monthKey] = {
+                                budget: Number(row.budget),
+                                actual: Number(row.actual),
+                            };
+
+                            if (!initialEdited[row.category_id]) initialEdited[row.category_id] = {};
+                            initialEdited[row.category_id][monthKey] = Number(row.budget);
+
+                            // For single month views, we still want these accessible via mtd_budget
+                            const currentMonthStart = format(startOfMonth(startDate), "yyyy-MM-dd");
+                            if (monthKey === currentMonthStart) {
+                                m.mtd_budget = Number(row.budget);
+                            }
+                        }
                     });
 
-                    const initialEdited: Record<string, number> = {};
-                    mergedMap.forEach((m) => {
-                        initialEdited[m.category_id] = m.mtd_budget;
-                    });
                     setEditedBudgets(initialEdited);
                 } else if (viewMode === "compare") {
                     const res = await apiClient.get<any[]>(
@@ -314,39 +329,41 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
         return result;
     };
 
-    const handleBudgetChange = (categoryId: string, value: string) => {
+    const handleBudgetChange = (categoryId: string, monthKey: string, value: string) => {
         const amount = parseFloat(value) || 0;
-        setEditedBudgets((prev: Record<string, number>) => ({
+        setEditedBudgets((prev: Record<string, Record<string, number>>) => ({
             ...prev,
-            [categoryId]: amount
+            [categoryId]: {
+                ...(prev[categoryId] || {}),
+                [monthKey]: amount
+            }
         }));
     };
 
     const handleSave = async () => {
         try {
             setSaving(true);
-            const mtdStart = format(startOfMonth(startDate), "yyyy-MM-dd");
-
             const promises: Promise<any>[] = [];
             const parentIds = new Set(mergedData.filter((d: MergedBudgetRecord) => d.isParent).map((d: MergedBudgetRecord) => d.category_id));
 
-            Object.entries(editedBudgets).forEach(([categoryId, amount]) => {
+            (Object.entries(editedBudgets) as [string, Record<string, number>][]).forEach(([categoryId, monthMap]) => {
                 // Only save for non-parent categories (leaves)
                 if (!parentIds.has(categoryId)) {
-                    promises.push(
-                        apiClient.post("/budgets", {
-                            category_id: categoryId,
-                            month: mtdStart,
-                            amount: amount,
-                        })
-                    );
+                    (Object.entries(monthMap) as [string, number][]).forEach(([monthKey, amount]) => {
+                        promises.push(
+                            apiClient.post("/budgets", {
+                                category_id: categoryId,
+                                month: monthKey,
+                                amount: amount,
+                            })
+                        );
+                    });
                 }
             });
 
             await Promise.all(promises);
             setIsEditing(false);
             if (onRefresh) onRefresh();
-            // Re-fetch will be triggered by isEditing changing to false
         } catch (error) {
             console.error("Failed to save budgets:", error);
             alert("Failed to save budgets.");
@@ -363,14 +380,18 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
     };
 
     const totals = useMemo(() => {
-        // When editing, we calculate totals based on edited values
+        // When editing, we calculate totals based on edited values for the CURRENTLY SELECTED month
         if (isEditing) {
+            const currentMonthStart = format(startOfMonth(startDate), "yyyy-MM-dd");
             const parentIds = new Set(mergedData.filter((d: MergedBudgetRecord) => d.isParent).map((d: MergedBudgetRecord) => d.category_id));
             let mtd_budget = 0;
-            Object.entries(editedBudgets).forEach(([id, amt]) => {
-                const amount = amt as number;
-                if (!parentIds.has(id)) mtd_budget += amount;
+
+            (Object.entries(editedBudgets) as [string, Record<string, number>][]).forEach(([catId, monthMap]) => {
+                if (!parentIds.has(catId)) {
+                    mtd_budget += monthMap[currentMonthStart] || 0;
+                }
             });
+
             return { mtd_budget, mtd_actual: 0, ytd_budget: 0, ytd_actual: 0 };
         }
 
@@ -418,14 +439,15 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
         return columnTotals;
     }, [mergedData, viewMode]);
 
-    // Helper to calculate parent sum from edited values
-    const getLeafSum = (parentId: string): number => {
+    // Helper to calculate parent sum from edited values for a specific month
+    const getLeafSum = (parentId: string, monthKey?: string): number => {
+        const mKey = monthKey || format(startOfMonth(startDate), "yyyy-MM-dd");
         const children = mergedData.filter((d: MergedBudgetRecord) => d.parent_id === parentId);
         return children.reduce((acc: number, child: MergedBudgetRecord) => {
             if (child.isParent) {
-                return acc + getLeafSum(child.category_id);
+                return acc + getLeafSum(child.category_id, mKey);
             }
-            return acc + (editedBudgets[child.category_id] || 0);
+            return acc + (editedBudgets[child.category_id]?.[mKey] || 0);
         }, 0);
     };
 
@@ -489,7 +511,10 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                         <Button
                             variant="primary"
                             size="sm"
-                            onClick={() => setIsEditing(true)}
+                            onClick={() => {
+                                setViewMode("compare");
+                                setIsEditing(true);
+                            }}
                             className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
                         >
                             <Edit3 className="mr-2 h-4 w-4" />
@@ -699,21 +724,17 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                         </>
                                     ) : (
                                         <>
-                                            {(viewMode === "mtd" || isEditing) && (
+                                            {(viewMode === "mtd") && (
                                                 <>
                                                     <TableHead className="text-right">
                                                         Budget
                                                     </TableHead>
-                                                    {!isEditing && (
-                                                        <>
-                                                            <TableHead className="text-right">
-                                                                Actual
-                                                            </TableHead>
-                                                            <TableHead className="text-right">
-                                                                Variance
-                                                            </TableHead>
-                                                        </>
-                                                    )}
+                                                    <TableHead className="text-right">
+                                                        Actual
+                                                    </TableHead>
+                                                    <TableHead className="text-right">
+                                                        Variance
+                                                    </TableHead>
                                                 </>
                                             )}
                                             {viewMode === "ytd" && !isEditing && (
@@ -759,10 +780,30 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                                         const monthDate = startOfMonth(subMonths(startDate, viewPeriod - 1 - i));
                                                         const monthKey = format(monthDate, "yyyy-MM-dd");
                                                         const data = item.monthlyData?.[monthKey] || { budget: 0, actual: 0 };
+
                                                         return (
                                                             <React.Fragment key={i}>
                                                                 <TableCell className="text-right border-l text-xs">
-                                                                    {data.budget !== 0 ? formatCurrency(data.budget) : "-"}
+                                                                    {isEditing ? (
+                                                                        <div className="flex justify-end">
+                                                                            <Input
+                                                                                type="number"
+                                                                                className={cn(
+                                                                                    "w-24 h-7 text-right text-xs p-1",
+                                                                                    item.isParent && "bg-transparent border-none shadow-none font-bold"
+                                                                                )}
+                                                                                value={item.isParent
+                                                                                    ? getLeafSum(item.category_id, monthKey).toFixed(2)
+                                                                                    : editedBudgets[item.category_id]?.[monthKey] === 0 ? "" : (editedBudgets[item.category_id]?.[monthKey] || 0)
+                                                                                }
+                                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => !item.isParent && handleBudgetChange(item.category_id, monthKey, e.target.value)}
+                                                                                disabled={item.isParent}
+                                                                                placeholder="0.00"
+                                                                            />
+                                                                        </div>
+                                                                    ) : (
+                                                                        data.budget !== 0 ? formatCurrency(data.budget) : "-"
+                                                                    )}
                                                                 </TableCell>
                                                                 <TableCell className="text-right text-xs text-muted-foreground">
                                                                     {data.actual !== 0 ? formatCurrency(data.actual) : "-"}
@@ -787,47 +828,24 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                                 </>
                                             ) : (
                                                 <>
-                                                    {(viewMode === "mtd" || isEditing) && (
+                                                    {(viewMode === "mtd") && (
                                                         <>
                                                             <TableCell className="text-right">
-                                                                {isEditing ? (
-                                                                    <div className="flex justify-end">
-                                                                        <Input
-                                                                            type="number"
-                                                                            className={cn(
-                                                                                "w-32 h-8 text-right",
-                                                                                item.isParent && "bg-transparent border-none shadow-none font-bold"
-                                                                            )}
-                                                                            value={item.isParent
-                                                                                ? getLeafSum(item.category_id).toFixed(2)
-                                                                                : editedBudgets[item.category_id] === 0 ? "" : (editedBudgets[item.category_id] || 0)
-                                                                            }
-                                                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => !item.isParent && handleBudgetChange(item.category_id, e.target.value)}
-                                                                            disabled={item.isParent}
-                                                                            placeholder="0.00"
-                                                                        />
-                                                                    </div>
-                                                                ) : (
-                                                                    formatCurrency(item.mtd_budget)
-                                                                )}
+                                                                {formatCurrency(item.mtd_budget)}
                                                             </TableCell>
-                                                            {!isEditing && (
-                                                                <>
-                                                                    <TableCell className="text-right text-muted-foreground">
-                                                                        {formatCurrency(item.mtd_actual)}
-                                                                    </TableCell>
-                                                                    <TableCell
-                                                                        className={cn(
-                                                                            "text-right font-medium",
-                                                                            mtdVar >= 0
-                                                                                ? "text-green-600"
-                                                                                : "text-red-600",
-                                                                        )}
-                                                                    >
-                                                                        {formatCurrency(mtdVar)}
-                                                                    </TableCell>
-                                                                </>
-                                                            )}
+                                                            <TableCell className="text-right text-muted-foreground">
+                                                                {formatCurrency(item.mtd_actual)}
+                                                            </TableCell>
+                                                            <TableCell
+                                                                className={cn(
+                                                                    "text-right font-medium",
+                                                                    mtdVar >= 0
+                                                                        ? "text-green-600"
+                                                                        : "text-red-600",
+                                                                )}
+                                                            >
+                                                                {formatCurrency(mtdVar)}
+                                                            </TableCell>
                                                         </>
                                                     )}
                                                     {viewMode === "ytd" && !isEditing && (
