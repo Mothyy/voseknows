@@ -28,7 +28,7 @@ import RegisterPage from "./pages/Register";
 
 function App() {
     return (
-        <ThemeProvider defaultTheme="light" storageKey="voseknows-ui-theme">
+        <ThemeProvider defaultTheme="system" storageKey="voseknows-ui-theme">
             <AuthProvider>
                 <Router>
                     <Routes>

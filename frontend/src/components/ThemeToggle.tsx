@@ -1,15 +1,31 @@
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
+import apiClient from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function ThemeToggle() {
     const { theme, setTheme } = useTheme();
+    const { user } = useAuth();
+
+    const toggleTheme = async () => {
+        const nextTheme = theme === "light" ? "dark" : "light";
+        setTheme(nextTheme);
+
+        if (user) {
+            try {
+                await apiClient.post("/settings/theme", { theme: nextTheme });
+            } catch (err) {
+                console.error("Failed to sync theme to backend:", err);
+            }
+        }
+    };
 
     return (
         <Button
             variant="ghost"
             size="icon"
-            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+            onClick={toggleTheme}
             className="w-9 h-9 rounded-md transition-colors hover:bg-accent hover:text-accent-foreground"
             title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
         >

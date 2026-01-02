@@ -195,7 +195,14 @@ const SettingsPage: React.FC = () => {
                 <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <button
-                            onClick={() => setTheme("light")}
+                            onClick={async () => {
+                                setTheme("light");
+                                try {
+                                    await apiClient.post("/settings/theme", { theme: "light" });
+                                } catch (err) {
+                                    console.error("Failed to save theme preference:", err);
+                                }
+                            }}
                             className={cn(
                                 "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
                                 theme === "light"
@@ -213,11 +220,18 @@ const SettingsPage: React.FC = () => {
                         </button>
 
                         <button
-                            onClick={() => setTheme("dark")}
+                            onClick={async () => {
+                                setTheme("dark");
+                                try {
+                                    await apiClient.post("/settings/theme", { theme: "dark" });
+                                } catch (err) {
+                                    console.error("Failed to save theme preference:", err);
+                                }
+                            }}
                             className={cn(
                                 "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
                                 theme === "dark"
-                                    ? "bg-slate-900 border-indigo-600 ring-2 ring-indigo-600/10"
+                                    ? "bg-indigo-950/20 dark:bg-indigo-950/40 border-indigo-600 ring-2 ring-indigo-600/10"
                                     : "bg-background border-border hover:border-indigo-200"
                             )}
                         >
@@ -231,15 +245,22 @@ const SettingsPage: React.FC = () => {
                         </button>
 
                         <button
-                            onClick={() => setTheme("system")}
+                            onClick={async () => {
+                                setTheme("system");
+                                try {
+                                    await apiClient.post("/settings/theme", { theme: "system" });
+                                } catch (err) {
+                                    console.error("Failed to save theme preference:", err);
+                                }
+                            }}
                             className={cn(
                                 "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
                                 theme === "system"
-                                    ? "bg-slate-100 dark:bg-slate-800 border-indigo-600 ring-2 ring-indigo-600/10"
+                                    ? "bg-muted border-indigo-600 ring-2 ring-indigo-600/10"
                                     : "bg-background border-border hover:border-indigo-200"
                             )}
                         >
-                            <div className="h-12 w-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300">
+                            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                                 <Monitor className="h-6 w-6" />
                             </div>
                             <div className="text-center">

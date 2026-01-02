@@ -39,7 +39,7 @@ router.post("/register", async (req: Request, res: Response) => {
 
         // Insert user
         const newUser = await query(
-            "INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, session_timeout_minutes",
+            "INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, session_timeout_minutes, theme_preference",
             [email, hashedPassword]
         );
 
@@ -55,6 +55,7 @@ router.post("/register", async (req: Request, res: Response) => {
         res.status(201).json({
             id: user.id,
             email: user.email,
+            theme_preference: user.theme_preference,
         });
     } catch (err) {
         console.error("Register Error:", err);
@@ -72,7 +73,7 @@ router.post("/login", async (req: Request, res: Response) => {
 
     try {
         const result = await query(
-            "SELECT id, email, password_hash, session_timeout_minutes FROM users WHERE email = $1",
+            "SELECT id, email, password_hash, session_timeout_minutes, theme_preference FROM users WHERE email = $1",
             [email]
         );
 
@@ -96,6 +97,7 @@ router.post("/login", async (req: Request, res: Response) => {
         res.json({
             id: user.id,
             email: user.email,
+            theme_preference: user.theme_preference,
         });
     } catch (err) {
         console.error("Login Error:", err);
@@ -120,7 +122,7 @@ router.get("/me", async (req: Request, res: Response) => {
     try {
         const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
         const result = await query(
-            "SELECT id, email, session_timeout_minutes FROM users WHERE id = $1",
+            "SELECT id, email, session_timeout_minutes, theme_preference FROM users WHERE id = $1",
             [decoded.id]
         );
 

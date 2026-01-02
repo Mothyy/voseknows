@@ -12,7 +12,7 @@ router.use(auth);
 router.get("/", async (req: any, res: Response) => {
     try {
         const result = await query(
-            "SELECT email, session_timeout_minutes FROM users WHERE id = $1",
+            "SELECT email, session_timeout_minutes, theme_preference FROM users WHERE id = $1",
             [req.user.id]
         );
 
@@ -44,6 +44,24 @@ router.post("/timeout", async (req: any, res: Response) => {
             [minutes, req.user.id]
         );
         res.json({ message: "Timeout updated successfully" });
+    } catch (err) {
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// @route   POST /api/settings/theme
+router.post("/theme", async (req: any, res: Response) => {
+    const { theme } = req.body;
+    if (!theme || !["light", "dark", "system"].includes(theme)) {
+        return res.status(400).json({ message: "Invalid theme value" });
+    }
+
+    try {
+        await query(
+            "UPDATE users SET theme_preference = $1 WHERE id = $2",
+            [theme, req.user.id]
+        );
+        res.json({ message: "Theme preference updated successfully" });
     } catch (err) {
         res.status(500).json({ message: "Server error" });
     }

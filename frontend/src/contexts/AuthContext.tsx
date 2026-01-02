@@ -5,6 +5,7 @@ interface User {
     id: string;
     email: string;
     session_timeout_minutes?: number;
+    theme_preference?: "light" | "dark" | "system";
 }
 
 interface AuthContextType {
