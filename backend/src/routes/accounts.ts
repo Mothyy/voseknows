@@ -2,28 +2,32 @@ import express = require("express");
 import { Request, Response } from "express";
 const router = express.Router();
 const { query } = require("../db");
+const auth = require("../middleware/auth");
+
+router.use(auth);
 
 /**
  * @route   GET /api/accounts
  * @desc    Get all accounts
  * @access  Public
  */
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: any, res: Response) => {
     try {
         const sql = `
             SELECT
                 a.id,
                 a.name,
                 a.type,
-                a.starting_balance,
-                (a.starting_balance + COALESCE(SUM(t.amount), 0))::numeric(15, 2) as balance,
+                a.balance as starting_balance,
+                (a.balance + COALESCE(SUM(t.amount), 0))::numeric(15, 2) as balance,
                 a.include_in_budget
             FROM accounts a
             LEFT JOIN transactions t ON a.id = t.account_id
+            WHERE a.user_id = $1
             GROUP BY a.id
             ORDER BY a.name ASC;
         `;
-        const { rows } = await query(sql, []);
+        const { rows } = await query(sql, [(req as any).user.id]);
         res.json(rows);
     } catch (err: any) {
         console.error("Error fetching accounts:", err);
@@ -36,7 +40,7 @@ router.get("/", async (req: Request, res: Response) => {
  * @desc    Create a new account
  * @access  Public
  */
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", async (req: any, res: Response) => {
     const { name, type, balance, include_in_budget } = req.body;
 
     if (!name || !type) {
@@ -48,15 +52,16 @@ router.post("/", async (req: Request, res: Response) => {
     try {
         // We treat the initial provided balance as the starting_balance
         const sql = `
-            INSERT INTO accounts (name, type, starting_balance, include_in_budget)
-                        VALUES ($1, $2, $3, $4)
-            RETURNING id, name, type, starting_balance, starting_balance as balance, include_in_budget;
+            INSERT INTO accounts (name, type, balance, include_in_budget, user_id)
+                        VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, name, type, balance as starting_balance, balance, include_in_budget;
         `;
         const { rows } = await query(sql, [
             name,
             type,
             balance || 0,
             include_in_budget !== false,
+            (req as any).user.id
         ]);
         res.status(201).json(rows[0]);
     } catch (err: any) {
@@ -76,7 +81,7 @@ router.post("/", async (req: Request, res: Response) => {
  * @desc    Get a single account by its ID
  * @access  Public
  */
-router.get("/:id", async (req: Request, res: Response) => {
+router.get("/:id", async (req: any, res: Response) => {
     const { id } = req.params;
     try {
         const sql = `
@@ -84,15 +89,15 @@ router.get("/:id", async (req: Request, res: Response) => {
                 a.id,
                 a.name,
                 a.type,
-                a.starting_balance,
-                (a.starting_balance + COALESCE(SUM(t.amount), 0))::numeric(15, 2) as balance,
+                a.balance as starting_balance,
+                (a.balance + COALESCE(SUM(t.amount), 0))::numeric(15, 2) as balance,
                 a.include_in_budget
             FROM accounts a
             LEFT JOIN transactions t ON a.id = t.account_id
-            WHERE a.id = $1
+            WHERE a.id = $1 AND a.user_id = $2
             GROUP BY a.id;
         `;
-        const { rows } = await query(sql, [id]);
+        const { rows } = await query(sql, [id, (req as any).user.id]);
         if (rows.length === 0) {
             return res.status(404).json({ error: "Account not found" });
         }
@@ -108,7 +113,7 @@ router.get("/:id", async (req: Request, res: Response) => {
  * @desc    Get all transactions for a specific account
  * @access  Public
  */
-router.get("/:id/transactions", async (req: Request, res: Response) => {
+router.get("/:id/transactions", async (req: any, res: Response) => {
     const { id } = req.params;
     const limit = req.query.limit || 10; // Default to 10 transactions
 
@@ -127,11 +132,11 @@ router.get("/:id/transactions", async (req: Request, res: Response) => {
             FROM transactions t
             JOIN accounts a ON t.account_id = a.id
             LEFT JOIN categories c ON t.category_id = c.id
-            WHERE t.account_id = $1
+            WHERE t.account_id = $1 AND a.user_id = $2
             ORDER BY t.date DESC, t.created_at DESC
-            LIMIT $2;
+            LIMIT $3;
         `;
-        const { rows } = await query(sql, [id, limit]);
+        const { rows } = await query(sql, [id, (req as any).user.id, limit]);
         res.json(rows);
     } catch (err: any) {
         console.error(`Error fetching transactions for account ${id}:`, err);
@@ -144,7 +149,7 @@ router.get("/:id/transactions", async (req: Request, res: Response) => {
  * @desc    Update an account
  * @access  Public
  */
-router.patch("/:id", async (req: Request, res: Response) => {
+router.patch("/:id", async (req: any, res: Response) => {
     const { id } = req.params;
     const { name, type, balance, include_in_budget } = req.body;
 
@@ -159,8 +164,8 @@ router.patch("/:id", async (req: Request, res: Response) => {
 
     try {
         const currentResult = await query(
-            "SELECT * FROM accounts WHERE id = $1",
-            [id],
+            "SELECT * FROM accounts WHERE id = $1 AND user_id = $2",
+            [id, (req as any).user.id],
         );
         if (currentResult.rows.length === 0) {
             return res.status(404).json({ error: "Account not found" });
@@ -173,7 +178,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
             starting_balance:
                 balance !== undefined
                     ? balance
-                    : currentAccount.starting_balance,
+                    : currentAccount.balance,
             include_in_budget:
                 include_in_budget !== undefined
                     ? include_in_budget
@@ -182,9 +187,9 @@ router.patch("/:id", async (req: Request, res: Response) => {
 
         const sql = `
             UPDATE accounts
-            SET name = $1, type = $2, starting_balance = $3, include_in_budget = $4
-            WHERE id = $5
-            RETURNING id, name, type, starting_balance, starting_balance as balance, include_in_budget;
+            SET name = $1, type = $2, balance = $3, include_in_budget = $4
+            WHERE id = $5 AND user_id = $6
+            RETURNING id, name, type, balance as starting_balance, balance, include_in_budget;
         `;
 
         const { rows } = await query(sql, [
@@ -193,6 +198,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
             updatedAccount.starting_balance,
             updatedAccount.include_in_budget,
             id,
+            (req as any).user.id
         ]);
         res.json(rows[0]);
     } catch (err: any) {
@@ -211,12 +217,12 @@ router.patch("/:id", async (req: Request, res: Response) => {
  * @desc    Delete all transactions for a specific account
  * @access  Public
  */
-router.delete("/:id/transactions", async (req: Request, res: Response) => {
+router.delete("/:id/transactions", async (req: any, res: Response) => {
     const { id } = req.params;
     try {
         const { rowCount } = await query(
-            "DELETE FROM transactions WHERE account_id = $1",
-            [id],
+            "DELETE FROM transactions WHERE account_id = $1 AND user_id = $2",
+            [id, (req as any).user.id],
         );
         res.json({
             message: `Successfully deleted ${rowCount} transactions.`,
@@ -233,7 +239,7 @@ router.delete("/:id/transactions", async (req: Request, res: Response) => {
  * @desc    Get expenditure summary by category for an account
  * @access  Public
  */
-router.get("/:id/category-summary", async (req: Request, res: Response) => {
+router.get("/:id/category-summary", async (req: any, res: Response) => {
     const { id } = req.params;
     try {
         const sql = `
@@ -242,11 +248,11 @@ router.get("/:id/category-summary", async (req: Request, res: Response) => {
                 ABS(SUM(t.amount))::numeric(15, 2) as value
             FROM transactions t
             LEFT JOIN categories c ON t.category_id = c.id
-            WHERE t.account_id = $1 AND t.amount < 0
+            WHERE t.account_id = $1 AND t.user_id = $2 AND t.amount < 0
             GROUP BY c.name
             ORDER BY value DESC;
         `;
-        const { rows } = await query(sql, [id]);
+        const { rows } = await query(sql, [id, (req as any).user.id]);
         res.json(rows);
     } catch (err: any) {
         console.error(
@@ -262,7 +268,7 @@ router.get("/:id/category-summary", async (req: Request, res: Response) => {
  * @desc    Get daily expenditure history for an account
  * @access  Public
  */
-router.get("/:id/history", async (req: Request, res: Response) => {
+router.get("/:id/history", async (req: any, res: Response) => {
     const { id } = req.params;
     try {
         const sql = `
@@ -270,11 +276,11 @@ router.get("/:id/history", async (req: Request, res: Response) => {
                 date,
                 ABS(SUM(amount))::numeric(15, 2) as amount
             FROM transactions
-            WHERE account_id = $1 AND amount < 0
+            WHERE account_id = $1 AND user_id = $2 AND amount < 0
             GROUP BY date
             ORDER BY date ASC;
         `;
-        const { rows } = await query(sql, [id]);
+        const { rows } = await query(sql, [id, (req as any).user.id]);
         res.json(rows);
     } catch (err: any) {
         console.error(`Error fetching history for account ${id}:`, err);
@@ -287,11 +293,12 @@ router.get("/:id/history", async (req: Request, res: Response) => {
  * @desc    Delete an account
  * @access  Public
  */
-router.delete("/:id", async (req: Request, res: Response) => {
+router.delete("/:id", async (req: any, res: Response) => {
     const { id } = req.params;
     try {
-        const { rowCount } = await query("DELETE FROM accounts WHERE id = $1", [
+        const { rowCount } = await query("DELETE FROM accounts WHERE id = $1 AND user_id = $2", [
             id,
+            (req as any).user.id
         ]);
         if (rowCount === 0) {
             return res.status(404).json({ error: "Account not found" });

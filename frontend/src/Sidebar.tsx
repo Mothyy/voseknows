@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "./contexts/AuthContext";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
     Accordion,
     AccordionContent,
@@ -34,6 +43,13 @@ const getIcon = (name: keyof typeof icons) => {
 export const Sidebar = () => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const location = useLocation();
+    const navigate = useNavigate();
+    const { user, logout } = useAuth();
+
+    const handleLogout = async () => {
+        await logout();
+        navigate("/login");
+    };
 
     const toggleSidebar = () => {
         setIsCollapsed(!isCollapsed);
@@ -126,7 +142,7 @@ export const Sidebar = () => {
                                                 cn(
                                                     "mt-1 flex items-center rounded-md py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
                                                     isActive &&
-                                                        "bg-accent text-accent-foreground",
+                                                    "bg-accent text-accent-foreground",
                                                     isCollapsed
                                                         ? "justify-center px-0"
                                                         : "gap-3 px-3",
@@ -151,7 +167,7 @@ export const Sidebar = () => {
                                     cn(
                                         "mt-1 flex items-center rounded-md py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
                                         isActive &&
-                                            "bg-accent text-accent-foreground",
+                                        "bg-accent text-accent-foreground",
                                         isCollapsed
                                             ? "justify-center px-0"
                                             : "gap-3 px-3",
@@ -170,8 +186,45 @@ export const Sidebar = () => {
                 </Accordion>
             </nav>
 
-            {/* Collapse Toggle Button */}
-            <div className="mt-auto border-t p-2">
+            {/* User Section & Collapse Toggle */}
+            <div className="mt-auto border-t p-2 space-y-2">
+                {user && (
+                    <div className={cn("px-2", isCollapsed ? "flex justify-center" : "")}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className={cn("w-full transition-all duration-300", isCollapsed ? "px-0" : "justify-start gap-3")}>
+                                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden shrink-0">
+                                        {user.email.charAt(0).toUpperCase()}
+                                    </div>
+                                    {!isCollapsed && (
+                                        <div className="flex flex-col items-start overflow-hidden">
+                                            <span className="text-sm font-medium truncate w-full">{user.email.split('@')[0]}</span>
+                                            <span className="text-[10px] text-muted-foreground truncate w-full">{user.email}</span>
+                                        </div>
+                                    )}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => navigate("/settings/profile")}>
+                                    <icons.User className="mr-2 h-4 w-4" />
+                                    <span>Profile</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => navigate("/settings/preferences")}>
+                                    <icons.Settings className="mr-2 h-4 w-4" />
+                                    <span>Settings</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                                    <icons.LogOut className="mr-2 h-4 w-4" />
+                                    <span>Log out</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                )}
+
                 <Button
                     variant="ghost"
                     size="icon"

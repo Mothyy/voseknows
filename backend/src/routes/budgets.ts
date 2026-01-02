@@ -2,13 +2,16 @@ import express = require("express");
 import { Request, Response } from "express";
 const router = express.Router();
 const { query } = require("../db");
+const auth = require("../middleware/auth");
+
+router.use(auth);
 
 /**
  * @route   GET /api/budgets
  * @desc    Get budget allocations for a specific month (list all categories with their budget)
  * @access  Public
  */
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: any, res: Response) => {
     const month = req.query.month as string;
 
     if (!month) {
@@ -26,10 +29,11 @@ router.get("/", async (req: Request, res: Response) => {
                 c.parent_id,
                 COALESCE(b.amount, 0) as budget_amount
             FROM categories c
-            LEFT JOIN budgets b ON c.id = b.category_id AND b.month = $1
+            LEFT JOIN budgets b ON c.id = b.category_id AND b.month = $1 AND b.user_id = $2
+            WHERE c.user_id = $2
             ORDER BY c.name ASC;
         `;
-        const { rows } = await query(sql, [month]);
+        const { rows } = await query(sql, [month, (req as any).user.id]);
         res.json(rows);
     } catch (err: any) {
         console.error("Error fetching budgets:", err);
@@ -42,7 +46,7 @@ router.get("/", async (req: Request, res: Response) => {
  * @desc    Set/Update budget for a category and month
  * @access  Public
  */
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", async (req: any, res: Response) => {
     const { category_id, month, amount } = req.body;
 
     if (!category_id || !month || amount === undefined) {
@@ -51,13 +55,13 @@ router.post("/", async (req: Request, res: Response) => {
 
     try {
         const sql = `
-            INSERT INTO budgets (category_id, month, amount)
-            VALUES ($1, $2, $3)
+            INSERT INTO budgets (category_id, month, amount, user_id)
+            VALUES ($1, $2, $3, $4)
             ON CONFLICT (category_id, month)
             DO UPDATE SET amount = EXCLUDED.amount
             RETURNING *;
         `;
-        const { rows } = await query(sql, [category_id, month, amount]);
+        const { rows } = await query(sql, [category_id, month, amount, (req as any).user.id]);
         res.json(rows[0]);
     } catch (err: any) {
         console.error("Error setting budget:", err);
@@ -70,7 +74,7 @@ router.post("/", async (req: Request, res: Response) => {
  * @desc    Get budget vs actuals for a specific month
  * @access  Public
  */
-router.get("/report", async (req: Request, res: Response) => {
+router.get("/report", async (req: any, res: Response) => {
     const month = req.query.month as string; // 'YYYY-MM-01'
 
     if (!month) {
@@ -103,6 +107,7 @@ router.get("/report", async (req: Request, res: Response) => {
                 WHERE t.date >= $1 AND t.date <= $2
                   AND a.include_in_budget = true
                   AND t.category_id IS NOT NULL
+                  AND t.user_id = $4
                 GROUP BY t.category_id
             ),
             monthly_budgets AS (
@@ -110,7 +115,7 @@ router.get("/report", async (req: Request, res: Response) => {
                     category_id,
                     amount as budget_amount
                 FROM budgets
-                WHERE month = $3
+                WHERE month = $3 AND user_id = $4
             )
             SELECT
                 c.id as category_id,
@@ -121,11 +126,12 @@ router.get("/report", async (req: Request, res: Response) => {
             FROM categories c
             LEFT JOIN monthly_budgets b ON c.id = b.category_id
             LEFT JOIN monthly_actuals a ON c.id = a.category_id
+            WHERE c.user_id = $4
             ORDER BY c.name ASC;
         `;
 
         // Note: For parameter $3 (budget month), we expect exact date match if stored as date 'YYYY-MM-01'
-        const { rows } = await query(sql, [startStr, endStr, month]);
+        const { rows } = await query(sql, [startStr, endStr, month, (req as any).user.id]);
         res.json(rows);
     } catch (err: any) {
         console.error("Error fetching budget report:", err);
@@ -138,7 +144,7 @@ router.get("/report", async (req: Request, res: Response) => {
  * @desc    Get cumulative budget vs actuals since start date
  * @access  Public
  */
-router.get("/summary", async (req: Request, res: Response) => {
+router.get("/summary", async (req: any, res: Response) => {
     const startDate = req.query.startDate as string;
 
     if (!startDate) {
@@ -158,6 +164,7 @@ router.get("/summary", async (req: Request, res: Response) => {
                 WHERE t.date >= $1
                   AND a.include_in_budget = true
                   AND t.category_id IS NOT NULL
+                  AND t.user_id = $2
                 GROUP BY t.category_id
             ),
             total_budgets AS (
@@ -165,7 +172,7 @@ router.get("/summary", async (req: Request, res: Response) => {
                     category_id,
                     SUM(amount) as total_budget
                 FROM budgets
-                WHERE month >= $1
+                WHERE month >= $1 AND user_id = $2
                 GROUP BY category_id
             )
             SELECT
@@ -177,11 +184,11 @@ router.get("/summary", async (req: Request, res: Response) => {
             FROM categories c
             LEFT JOIN total_budgets b ON c.id = b.category_id
             LEFT JOIN total_actuals a ON c.id = a.category_id
-            WHERE COALESCE(b.total_budget, 0) > 0 OR COALESCE(a.total_actual, 0) != 0
+            WHERE c.user_id = $2 AND (COALESCE(b.total_budget, 0) > 0 OR COALESCE(a.total_actual, 0) != 0)
             ORDER BY c.name ASC;
         `;
 
-        const { rows } = await query(sql, [startDate]);
+        const { rows } = await query(sql, [startDate, (req as any).user.id]);
         res.json(rows);
     } catch (err: any) {
         console.error("Error fetching budget summary:", err);

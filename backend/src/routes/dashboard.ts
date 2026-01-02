@@ -2,13 +2,16 @@ import express = require("express");
 import { Request, Response } from "express";
 const router = express.Router();
 const { query } = require("../db");
+const auth = require("../middleware/auth");
+
+router.use(auth);
 
 /**
  * @route   GET /api/dashboard
  * @desc    Get dashboard summary data
  * @access  Public
  */
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: any, res: Response) => {
     const { start, end } = req.query;
 
     if (!start || !end) {
@@ -18,10 +21,11 @@ router.get("/", async (req: Request, res: Response) => {
     }
 
     try {
+        const userId = req.user.id;
         const [summary, worthOverTime, categoryVariance] = await Promise.all([
-            getSummary(start as string, end as string),
-            getWorthOverTime(start as string, end as string),
-            getCategoryVariance(start as string, end as string),
+            getSummary(start as string, end as string, userId),
+            getWorthOverTime(start as string, end as string, userId),
+            getCategoryVariance(start as string, end as string, userId),
         ]);
 
         res.json({
@@ -35,7 +39,7 @@ router.get("/", async (req: Request, res: Response) => {
     }
 });
 
-async function getSummary(startDate: string, endDate: string) {
+async function getSummary(startDate: string, endDate: string, userId: string) {
     const sql = `
         WITH total_actuals AS (
             SELECT SUM(t.amount) as total_actual
@@ -44,18 +48,20 @@ async function getSummary(startDate: string, endDate: string) {
             WHERE t.date >= $1 AND t.date <= $2
               AND a.include_in_budget = true
               AND t.category_id IS NOT NULL
+              AND t.user_id = $3
         ),
         total_budgets AS (
             SELECT SUM(amount) as total_budget
             FROM budgets
             WHERE month >= $1 AND month <= $2
+              AND user_id = $3
         )
         SELECT
             COALESCE((SELECT total_budget FROM total_budgets), 0)::numeric(15, 2) as "totalBudget",
             COALESCE((SELECT total_actual FROM total_actuals), 0)::numeric(15, 2) as "totalSpend"
     `;
 
-    const { rows } = await query(sql, [startDate, endDate]);
+    const { rows } = await query(sql, [startDate, endDate, userId]);
     const summary = rows[0];
     const variance = summary.totalBudget + summary.totalSpend;
 
@@ -66,18 +72,18 @@ async function getSummary(startDate: string, endDate: string) {
     };
 }
 
-async function getWorthOverTime(startDate: string, endDate: string) {
+async function getWorthOverTime(startDate: string, endDate: string, userId: string) {
     // 1. Get total starting balance of all accounts
     const startingRes = await query(
-        `SELECT SUM(starting_balance) as total FROM accounts`,
-        [],
+        `SELECT SUM(balance) as total FROM accounts WHERE user_id = $1`,
+        [userId],
     );
     const initialBase = parseFloat(startingRes.rows[0].total || "0");
 
     // 2. Get net change from transactions BEFORE startDate
     const preHistoryRes = await query(
-        `SELECT SUM(amount) as total FROM transactions WHERE date < $1`,
-        [startDate],
+        `SELECT SUM(amount) as total FROM transactions WHERE date < $1 AND user_id = $2`,
+        [startDate, userId],
     );
     const preHistoryChange = parseFloat(preHistoryRes.rows[0].total || "0");
 
@@ -91,7 +97,7 @@ async function getWorthOverTime(startDate: string, endDate: string) {
         daily_changes AS (
             SELECT date, SUM(amount) as change
             FROM transactions
-            WHERE date >= $1 AND date <= $2
+            WHERE date >= $1 AND date <= $2 AND user_id = $3
             GROUP BY date
         )
         SELECT
@@ -102,7 +108,7 @@ async function getWorthOverTime(startDate: string, endDate: string) {
         ORDER BY ds.day ASC
     `;
 
-    const { rows } = await query(historySql, [startDate, endDate]);
+    const { rows } = await query(historySql, [startDate, endDate, userId]);
 
     // Calculate running total
     const history = rows.map((row: any) => {
@@ -121,7 +127,7 @@ async function getWorthOverTime(startDate: string, endDate: string) {
     return history;
 }
 
-async function getCategoryVariance(startDate: string, endDate: string) {
+async function getCategoryVariance(startDate: string, endDate: string, userId: string) {
     const sql = `
         WITH range_actuals AS (
             SELECT category_id, SUM(amount) as actual
@@ -129,12 +135,14 @@ async function getCategoryVariance(startDate: string, endDate: string) {
             JOIN accounts a ON t.account_id = a.id
             WHERE t.date >= $1 AND t.date <= $2
             AND a.include_in_budget = true
+            AND t.user_id = $3
             GROUP BY category_id
         ),
         range_budgets AS (
             SELECT category_id, SUM(amount) as budget
             FROM budgets
             WHERE month >= $1 AND month <= $2
+            AND user_id = $3
             GROUP BY category_id
         )
         SELECT
@@ -143,11 +151,11 @@ async function getCategoryVariance(startDate: string, endDate: string) {
         FROM categories c
         LEFT JOIN range_budgets b ON c.id = b.category_id
         LEFT JOIN range_actuals a ON c.id = a.category_id
-        WHERE COALESCE(b.budget, 0) > 0 OR COALESCE(a.actual, 0) != 0
+        WHERE c.user_id = $3 AND (COALESCE(b.budget, 0) > 0 OR COALESCE(a.actual, 0) != 0)
         ORDER BY variance ASC
     `;
 
-    const { rows } = await query(sql, [startDate, endDate]);
+    const { rows } = await query(sql, [startDate, endDate, userId]);
     return rows.map((row: any) => ({
         name: row.name,
         variance: parseFloat(row.variance),

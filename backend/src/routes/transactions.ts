@@ -4,14 +4,18 @@ import type { Request, Response } from "express";
 
 const router = express.Router();
 const { query } = require("../db");
+const auth = require("../middleware/auth");
+
+router.use(auth);
 
 /**
  * @route   GET /api/transactions
  * @desc    Get all transactions with account and category information
- * @access  Public
+ * @access  Private
  */
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: any, res: Response) => {
     try {
+        const userId = req.user.id;
         const page = parseInt(req.query.page as string) || 1;
         let limit = parseInt(req.query.limit as string) || 50;
         const search = (req.query.search as string) || "";
@@ -23,8 +27,8 @@ router.get("/", async (req: Request, res: Response) => {
         }
 
         const offset = (page - 1) * limit;
-        const params: any[] = [];
-        const whereClauses: string[] = [];
+        const params: any[] = [userId];
+        const whereClauses: string[] = ["t.user_id = $1"];
 
         if (search) {
             params.push(`%${search}%`);
@@ -74,7 +78,7 @@ router.get("/", async (req: Request, res: Response) => {
             WITH balance_calc AS (
                 SELECT
                     t.*,
-                    (a.starting_balance + SUM(t.amount) OVER (
+                    (a.balance + SUM(t.amount) OVER (
                         PARTITION BY t.account_id
                         ORDER BY t.date ASC, t.created_at ASC
                     ))::numeric(15, 2) as balance
@@ -121,7 +125,7 @@ router.get("/", async (req: Request, res: Response) => {
  * @desc    Bulk update transactions (e.g. categorize multiple)
  * @access  Public
  */
-router.post("/bulk-update", async (req: Request, res: Response) => {
+router.post("/bulk-update", async (req: any, res: Response) => {
     const { transactionIds, categoryId } = req.body;
 
     if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
@@ -132,11 +136,12 @@ router.post("/bulk-update", async (req: Request, res: Response) => {
         const sql = `
             UPDATE transactions
             SET category_id = $1
-            WHERE id = ANY($2::uuid[])
+            WHERE id = ANY($2::uuid[]) AND user_id = $3
         `;
         const { rowCount } = await query(sql, [
             categoryId || null,
             transactionIds,
+            req.user.id
         ]);
 
         res.json({ message: `Successfully updated ${rowCount} transactions` });
@@ -151,7 +156,7 @@ router.post("/bulk-update", async (req: Request, res: Response) => {
  * @desc    Get a single transaction by its ID
  * @access  Public
  */
-router.get("/:id", async (req: Request, res: Response) => {
+router.get("/:id", async (req: any, res: Response) => {
     const { id } = req.params;
     try {
         const sql = `
@@ -164,9 +169,9 @@ router.get("/:id", async (req: Request, res: Response) => {
                 t.account_id,
                 t.category_id
             FROM transactions t
-            WHERE t.id = $1;
+            WHERE t.id = $1 AND t.user_id = $2;
         `;
-        const { rows } = await query(sql, [id]);
+        const { rows } = await query(sql, [id, req.user.id]);
         if (rows.length === 0) {
             return res.status(404).json({ error: "Transaction not found" });
         }
@@ -182,7 +187,7 @@ router.get("/:id", async (req: Request, res: Response) => {
  * @desc    Create a new transaction
  * @access  Public
  */
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", async (req: any, res: Response) => {
     const { account_id, category_id, date, description, amount, status } =
         req.body;
 
@@ -194,8 +199,8 @@ router.post("/", async (req: Request, res: Response) => {
 
     try {
         const sql = `
-            INSERT INTO transactions (account_id, category_id, date, description, amount, status)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO transactions (account_id, category_id, date, description, amount, status, user_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *;
         `;
         const { rows } = await query(sql, [
@@ -205,6 +210,7 @@ router.post("/", async (req: Request, res: Response) => {
             description,
             amount,
             status || "pending",
+            req.user.id
         ]);
         res.status(201).json(rows[0]);
     } catch (err: any) {
@@ -218,7 +224,7 @@ router.post("/", async (req: Request, res: Response) => {
  * @desc    Update a transaction's details
  * @access  Public
  */
-router.patch("/:id", async (req: Request, res: Response) => {
+router.patch("/:id", async (req: any, res: Response) => {
     const { id } = req.params;
     const { category_id, description, status, date, amount } = req.body;
 
@@ -232,8 +238,8 @@ router.patch("/:id", async (req: Request, res: Response) => {
 
     try {
         const currentResult = await query(
-            "SELECT * FROM transactions WHERE id = $1",
-            [id],
+            "SELECT * FROM transactions WHERE id = $1 AND user_id = $2",
+            [id, req.user.id],
         );
         if (currentResult.rows.length === 0) {
             return res.status(404).json({ error: "Transaction not found" });
@@ -258,7 +264,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
         const sql = `
             UPDATE transactions
             SET category_id = $1, description = $2, status = $3, date = $4, amount = $5
-            WHERE id = $6
+            WHERE id = $6 AND user_id = $7
             RETURNING *;
         `;
         const { rows } = await query(sql, [
@@ -268,6 +274,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
             updatedTxn.date,
             updatedTxn.amount,
             id,
+            req.user.id
         ]);
         res.json(rows[0]);
     } catch (err: any) {
@@ -281,12 +288,12 @@ router.patch("/:id", async (req: Request, res: Response) => {
  * @desc    Delete a transaction
  * @access  Public
  */
-router.delete("/:id", async (req: Request, res: Response) => {
+router.delete("/:id", async (req: any, res: Response) => {
     const { id } = req.params;
     try {
         const { rowCount } = await query(
-            "DELETE FROM transactions WHERE id = $1",
-            [id],
+            "DELETE FROM transactions WHERE id = $1 AND user_id = $2",
+            [id, req.user.id],
         );
         if (rowCount === 0) {
             return res.status(404).json({ error: "Transaction not found" });

@@ -2,20 +2,24 @@ import express = require("express");
 import { Request, Response } from "express";
 const router = express.Router();
 const { query } = require("../db");
+const auth = require("../middleware/auth");
+
+router.use(auth);
 
 /**
  * @route   GET /api/categories
  * @desc    Get all categories
  * @access  Public
  */
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: any, res: Response) => {
     try {
         const sql = `
             SELECT id, name, parent_id
             FROM categories
+            WHERE user_id = $1
             ORDER BY sort_order, name ASC;
         `;
-        const { rows: categories } = await query(sql, []);
+        const { rows: categories } = await query(sql, [(req as any).user.id]);
 
         // Helper function to build the tree structure
         const buildTree = (list: any[]): any[] => {
@@ -53,7 +57,7 @@ router.get("/", async (req: Request, res: Response) => {
  * @desc    Create a new category
  * @access  Public
  */
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", async (req: any, res: Response) => {
     const { name, parent_id } = req.body; // parent_id is optional
 
     if (!name) {
@@ -62,11 +66,11 @@ router.post("/", async (req: Request, res: Response) => {
 
     try {
         const sql = `
-            INSERT INTO categories (name, parent_id)
-            VALUES ($1, $2)
+            INSERT INTO categories (name, parent_id, user_id)
+            VALUES ($1, $2, $3)
             RETURNING *;
         `;
-        const { rows } = await query(sql, [name, parent_id || null]);
+        const { rows } = await query(sql, [name, parent_id || null, (req as any).user.id]);
         res.status(201).json(rows[0]);
     } catch (err: any) {
         console.error("Error creating category:", err);
@@ -84,7 +88,7 @@ router.post("/", async (req: Request, res: Response) => {
  * @desc    Update a category
  * @access  Public
  */
-router.patch("/:id", async (req: Request, res: Response) => {
+router.patch("/:id", async (req: any, res: Response) => {
     const { id } = req.params;
     const { name, parent_id, sort_order } = req.body;
 
@@ -118,12 +122,13 @@ router.patch("/:id", async (req: Request, res: Response) => {
             values.push(sort_order);
         }
 
-        values.push(id); // For the WHERE clause
+        values.push(id); // This will be $paramIndex
+        values.push((req as any).user.id); // This will be $paramIndex + 1
 
         const sql = `
             UPDATE categories
             SET ${setClauses.join(", ")}
-            WHERE id = $${paramIndex}
+            WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1}
             RETURNING *;
         `;
 
@@ -149,12 +154,12 @@ router.patch("/:id", async (req: Request, res: Response) => {
  * @desc    Delete a category
  * @access  Public
  */
-router.delete("/:id", async (req: Request, res: Response) => {
+router.delete("/:id", async (req: any, res: Response) => {
     const { id } = req.params;
     try {
         const { rowCount } = await query(
-            "DELETE FROM categories WHERE id = $1",
-            [id],
+            "DELETE FROM categories WHERE id = $1 AND user_id = $2",
+            [id, (req as any).user.id],
         );
         if (rowCount === 0) {
             return res.status(404).json({ error: "Category not found" });

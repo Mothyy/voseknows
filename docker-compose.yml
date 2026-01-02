@@ -51,7 +51,7 @@ services:
         volumes:
             - postgres_data:/var/lib/postgresql/data
             # The entrypoint script will always run this schema file on a fresh DB.
-            - ./backend/db-init/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+            - ./backend/db-init:/docker-entrypoint-initdb.d
         networks:
             - voseknows-network
         healthcheck:

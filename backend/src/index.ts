@@ -2,6 +2,7 @@
 import express = require("express");
 import dotenv = require("dotenv");
 import cors = require("cors");
+import cookieParser = require("cookie-parser");
 
 // Import types for Express
 import type { Request, Response } from "express";
@@ -15,6 +16,8 @@ const dataProviderRoutes = require("./routes/dataProviders");
 const importRoutes = require("./routes/imports");
 const budgetRoutes = require("./routes/budgets");
 const reportRoutes = require("./routes/reports");
+const authRoutes = require("./routes/auth");
+const settingsRoutes = require("./routes/settings");
 
 // Configure dotenv to read .env file
 dotenv.config();
@@ -23,8 +26,12 @@ const app = express();
 const port = 3001;
 
 // Middleware setup
-app.use(cors());
+app.use(cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 // API Routes
 app.use("/api/transactions", transactionRoutes);
@@ -34,6 +41,8 @@ app.use("/api/data-providers", dataProviderRoutes);
 app.use("/api/imports", importRoutes);
 app.use("/api/budgets", budgetRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // A simple root route to confirm the server is running
 app.get("/", (req: Request, res: Response) => {

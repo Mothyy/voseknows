@@ -3,13 +3,16 @@ import type { Request, Response } from "express";
 
 const router = express.Router();
 const { query } = require("../db");
+const auth = require("../middleware/auth");
+
+router.use(auth);
 
 /**
  * @route   GET /api/reports/budget-variance
  * @desc    Get budget vs actuals for a date range
  * @access  Public
  */
-router.get("/budget-variance", async (req: Request, res: Response) => {
+router.get("/budget-variance", async (req: any, res: Response) => {
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
@@ -23,7 +26,7 @@ router.get("/budget-variance", async (req: Request, res: Response) => {
             WITH range_budgets AS (
                 SELECT category_id, SUM(amount) as total_budget
                 FROM budgets
-                WHERE month >= $1 AND month <= $2
+                WHERE month >= $1 AND month <= $2 AND user_id = $3
                 GROUP BY category_id
             ),
             range_actuals AS (
@@ -32,6 +35,7 @@ router.get("/budget-variance", async (req: Request, res: Response) => {
                 JOIN accounts a ON t.account_id = a.id
                 WHERE t.date >= $1 AND t.date <= $2
                   AND a.include_in_budget = true
+                  AND t.user_id = $3
                 GROUP BY t.category_id
             )
             SELECT
@@ -43,7 +47,7 @@ router.get("/budget-variance", async (req: Request, res: Response) => {
             FROM categories c
             LEFT JOIN range_budgets b ON c.id = b.category_id
             LEFT JOIN range_actuals a ON c.id = a.category_id
-            WHERE COALESCE(b.total_budget, 0) > 0 OR COALESCE(a.total_actual, 0) != 0
+            WHERE c.user_id = $3 AND (COALESCE(b.total_budget, 0) > 0 OR COALESCE(a.total_actual, 0) != 0)
             
             UNION ALL
             
@@ -59,7 +63,7 @@ router.get("/budget-variance", async (req: Request, res: Response) => {
             ORDER BY name ASC;
         `;
 
-        const { rows } = await query(sql, [startDate, endDate]);
+        const { rows } = await query(sql, [startDate, endDate, (req as any).user.id]);
         res.json(rows);
     } catch (err: any) {
         console.error("Error fetching budget variance:", err);
@@ -72,7 +76,7 @@ router.get("/budget-variance", async (req: Request, res: Response) => {
  * @desc    Get budget vs actuals broken down by month for a date range
  * @access  Public
  */
-router.get("/monthly-comparison", async (req: Request, res: Response) => {
+router.get("/monthly-comparison", async (req: any, res: Response) => {
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
@@ -94,11 +98,12 @@ router.get("/monthly-comparison", async (req: Request, res: Response) => {
                 SELECT c.id as category_id, c.name as category_name, c.parent_id, m.month_date
                 FROM categories c
                 CROSS JOIN months m
+                WHERE c.user_id = $3
             ),
             monthly_budgets AS (
                 SELECT category_id, month, amount
                 FROM budgets
-                WHERE month >= $1 AND month <= $2
+                WHERE month >= $1 AND month <= $2 AND user_id = $3
             ),
             monthly_actuals AS (
                 SELECT t.category_id, date_trunc('month', t.date)::date as month, SUM(t.amount) as amount
@@ -106,6 +111,7 @@ router.get("/monthly-comparison", async (req: Request, res: Response) => {
                 JOIN accounts a ON t.account_id = a.id
                 WHERE t.date >= $1 AND t.date <= $2
                   AND a.include_in_budget = true
+                  AND t.user_id = $3
                 GROUP BY t.category_id, date_trunc('month', t.date)
             )
             SELECT
@@ -135,7 +141,7 @@ router.get("/monthly-comparison", async (req: Request, res: Response) => {
             ORDER BY category_name ASC, month ASC;
         `;
 
-        const { rows } = await query(sql, [startDate, endDate]);
+        const { rows } = await query(sql, [startDate, endDate, (req as any).user.id]);
         res.json(rows);
     } catch (err: any) {
         console.error("Error fetching monthly comparison:", err);
@@ -148,7 +154,7 @@ router.get("/monthly-comparison", async (req: Request, res: Response) => {
  * @desc    Get daily total wealth over time
  * @access  Public
  */
-router.get("/wealth", async (req: Request, res: Response) => {
+router.get("/wealth", async (req: any, res: Response) => {
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
@@ -161,16 +167,17 @@ router.get("/wealth", async (req: Request, res: Response) => {
         // 1. Calculate the starting balance for all accounts prior to the startDate
         const initialBalanceSql = `
         SELECT
-        SUM(a.starting_balance + COALESCE(t_sum.amount, 0)) as opening_balance
+        SUM(a.balance + COALESCE(t_sum.amount, 0)) as opening_balance
             FROM accounts a
             LEFT JOIN(
             SELECT account_id, SUM(amount) as amount
                 FROM transactions
-                WHERE date < $1
+                WHERE date < $1 AND user_id = $2
                 GROUP BY account_id
         ) t_sum ON a.id = t_sum.account_id
+        WHERE a.user_id = $2
             `;
-        const initialRes = await query(initialBalanceSql, [startDate]);
+        const initialRes = await query(initialBalanceSql, [startDate, (req as any).user.id]);
         let currentBalance = parseFloat(
             initialRes.rows[0].opening_balance || "0",
         );
@@ -181,11 +188,11 @@ router.get("/wealth", async (req: Request, res: Response) => {
         date,
             SUM(amount) as daily_change
             FROM transactions
-            WHERE date >= $1 AND date <= $2
+            WHERE date >= $1 AND date <= $2 AND user_id = $3
             GROUP BY date
             ORDER BY date ASC
             `;
-        const changesRes = await query(dailyChangesSql, [startDate, endDate]);
+        const changesRes = await query(dailyChangesSql, [startDate, endDate, (req as any).user.id]);
 
         // 3. Construct the time series
         const start = new Date(startDate as string);

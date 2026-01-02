@@ -8,6 +8,7 @@ import AccountsPage from "@/pages/Accounts";
 import AccountDetailPage from "@/pages/AccountDetailPage";
 import ConnectionsPage from "@/pages/Connections";
 import ReportsPage from "@/pages/Reports";
+import SettingsPage from "@/pages/Settings";
 
 // A simple placeholder for other pages
 const GenericPage = ({ title }: { title: string }) => (
@@ -19,37 +20,54 @@ const GenericPage = ({ title }: { title: string }) => (
     </div>
 );
 
+import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import LoginPage from "./pages/Login";
+import RegisterPage from "./pages/Register";
+
 function App() {
     return (
-        <Router>
-            <Routes>
-                <Route path="/" element={<MainLayout />}>
-                    <Route index element={<Dashboard />} />
-                    <Route path="transactions" element={<Transactions />} />
-                    <Route path="accounts" element={<AccountsPage />} />
+        <AuthProvider>
+            <Router>
+                <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+
                     <Route
-                        path="accounts/:id"
-                        element={<AccountDetailPage />}
-                    />
-                    <Route path="categories" element={<Categories />} />
-                    <Route path="budgets" element={<Budget />} />
-                    <Route path="reports" element={<ReportsPage />} />
-                    <Route
-                        path="settings/profile"
-                        element={<GenericPage title="Profile Settings" />}
-                    />
-                    <Route
-                        path="settings/preferences"
-                        element={<GenericPage title="Preferences" />}
-                    />
-                    <Route path="connections" element={<ConnectionsPage />} />
-                    <Route
-                        path="*"
-                        element={<GenericPage title="404 - Not Found" />}
-                    />
-                </Route>
-            </Routes>
-        </Router>
+                        path="/"
+                        element={
+                            <ProtectedRoute>
+                                <MainLayout />
+                            </ProtectedRoute>
+                        }
+                    >
+                        <Route index element={<Dashboard />} />
+                        <Route path="transactions" element={<Transactions />} />
+                        <Route path="accounts" element={<AccountsPage />} />
+                        <Route
+                            path="accounts/:id"
+                            element={<AccountDetailPage />}
+                        />
+                        <Route path="categories" element={<Categories />} />
+                        <Route path="budgets" element={<Budget />} />
+                        <Route path="reports" element={<ReportsPage />} />
+                        <Route
+                            path="settings/profile"
+                            element={<SettingsPage />}
+                        />
+                        <Route
+                            path="settings/preferences"
+                            element={<SettingsPage />}
+                        />
+                        <Route path="connections" element={<ConnectionsPage />} />
+                        <Route
+                            path="*"
+                            element={<GenericPage title="404 - Not Found" />}
+                        />
+                    </Route>
+                </Routes>
+            </Router>
+        </AuthProvider>
     );
 }
 
