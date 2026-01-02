@@ -13,6 +13,7 @@ interface ImportResult {
 class ImportService {
     async importOfx(
         ofxData: string,
+        userId: string,
         targetAccountId?: string,
     ): Promise<ImportResult> {
         const parsedData = parse(ofxData);
@@ -80,6 +81,7 @@ class ImportService {
                     msg.CCSTMTRS,
                     connectionId,
                     "credit",
+                    userId,
                     targetAccountId,
                 );
                 if (stats) result.accounts.push(stats);
@@ -97,6 +99,7 @@ class ImportService {
                     msg.STMTRS,
                     connectionId,
                     "checking",
+                    userId,
                     targetAccountId,
                 );
                 if (stats) result.accounts.push(stats);
@@ -108,6 +111,7 @@ class ImportService {
 
     async importQif(
         qifData: string,
+        userId: string,
         targetAccountId?: string,
         dateFormat: string = "MM/DD/YYYY",
     ): Promise<ImportResult> {
@@ -136,17 +140,17 @@ class ImportService {
         const institutionName = "QIF Manual Import";
         let connectionId;
         const connectionRes = await query(
-            "SELECT id FROM provider_connections WHERE provider_id = $1 AND institution_name = $2",
-            [providerId, institutionName],
+            "SELECT id FROM provider_connections WHERE provider_id = $1 AND institution_name = $2 AND user_id = $3",
+            [providerId, institutionName, userId],
         );
 
         if (connectionRes.rows.length > 0) {
             connectionId = connectionRes.rows[0].id;
         } else {
             const newConnection = await query(
-                `INSERT INTO provider_connections (provider_id, api_key, customer_id, institution_name)
-                 VALUES ($1, 'manual', 'manual', $2) RETURNING id`,
-                [providerId, institutionName],
+                `INSERT INTO provider_connections (provider_id, api_key, customer_id, institution_name, user_id)
+                 VALUES ($1, 'manual', 'manual', $2, $3) RETURNING id`,
+                [providerId, institutionName, userId],
             );
             connectionId = newConnection.rows[0].id;
         }
@@ -154,24 +158,30 @@ class ImportService {
         // 3. Find or Create Account
         let accountId: string;
         if (targetAccountId) {
+            // Verify ownership
+            const ownershipRes = await query("SELECT id FROM accounts WHERE id = $1 AND user_id = $2", [targetAccountId, userId]);
+            if (ownershipRes.rows.length === 0) {
+                throw new Error("Target account not found or access denied.");
+            }
             accountId = targetAccountId;
         } else {
             const accountRes = await query(
-                "SELECT id FROM accounts WHERE provider_account_id = $1",
-                ["qif-default"],
+                "SELECT id FROM accounts WHERE provider_account_id = $1 AND user_id = $2",
+                ["qif-default", userId],
             );
 
             if (accountRes.rows.length > 0) {
                 accountId = accountRes.rows[0].id;
             } else {
                 const newAccount = await query(
-                    `INSERT INTO accounts (connection_id, provider_account_id, name, type, balance)
-                     VALUES ($1, $2, $3, $4, 0) RETURNING id`,
+                    `INSERT INTO accounts (connection_id, provider_account_id, name, type, balance, user_id)
+                     VALUES ($1, $2, $3, $4, 0, $5) RETURNING id`,
                     [
                         connectionId,
                         "qif-default",
                         "Default QIF Account",
                         "checking",
+                        userId
                     ],
                 );
                 accountId = newAccount.rows[0].id;
@@ -231,11 +241,11 @@ class ImportService {
             try {
                 const insertRes = await query(
                     `INSERT INTO transactions
-                    (account_id, provider_transaction_id, date, description, amount, status)
-                    VALUES ($1, $2, $3, $4, $5, 'cleared')
+                    (account_id, provider_transaction_id, date, description, amount, status, user_id)
+                    VALUES ($1, $2, $3, $4, $5, 'cleared', $6)
                     ON CONFLICT (provider_transaction_id) DO NOTHING
                     RETURNING id`,
-                    [accountId, fitId, txn.date, description, txn.amount],
+                    [accountId, fitId, txn.date, description, txn.amount, userId],
                 );
 
                 if (insertRes.rowCount && insertRes.rowCount > 0) {
@@ -282,6 +292,7 @@ class ImportService {
         stmtRs: any,
         connectionId: string,
         defaultType: string,
+        userId: string,
         targetAccountId?: string,
     ) {
         // Identify Account
@@ -299,24 +310,30 @@ class ImportService {
         // Find or Create Account
         let accountId;
         if (targetAccountId) {
+            // Verify ownership
+            const ownershipRes = await query("SELECT id FROM accounts WHERE id = $1 AND user_id = $2", [targetAccountId, userId]);
+            if (ownershipRes.rows.length === 0) {
+                return null; // Or throw
+            }
             accountId = targetAccountId;
         } else {
             const accountRes = await query(
-                "SELECT id FROM accounts WHERE provider_account_id = $1",
-                [accountIdRaw],
+                "SELECT id FROM accounts WHERE provider_account_id = $1 AND user_id = $2",
+                [accountIdRaw, userId],
             );
 
             if (accountRes.rows.length > 0) {
                 accountId = accountRes.rows[0].id;
             } else {
                 const newAccount = await query(
-                    `INSERT INTO accounts (connection_id, provider_account_id, name, type, balance)
-                 VALUES ($1, $2, $3, $4, 0) RETURNING id`,
+                    `INSERT INTO accounts (connection_id, provider_account_id, name, type, balance, user_id)
+                 VALUES ($1, $2, $3, $4, 0, $5) RETURNING id`,
                     [
                         connectionId,
                         accountIdRaw,
                         `Imported Account ${accountIdRaw}`,
                         defaultType,
+                        userId
                     ],
                 );
                 accountId = newAccount.rows[0].id;
@@ -350,11 +367,11 @@ class ImportService {
             try {
                 const result = await query(
                     `INSERT INTO transactions
-                    (account_id, provider_transaction_id, date, description, amount, status)
-                    VALUES ($1, $2, $3, $4, $5, 'cleared')
+                    (account_id, provider_transaction_id, date, description, amount, status, user_id)
+                    VALUES ($1, $2, $3, $4, $5, 'cleared', $6)
                     ON CONFLICT (provider_transaction_id) DO NOTHING
                     RETURNING id`,
-                    [accountId, fitId, formattedDate, memo, amount],
+                    [accountId, fitId, formattedDate, memo, amount, userId],
                 );
 
                 if (result.rowCount && result.rowCount > 0) {

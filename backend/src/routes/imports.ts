@@ -1,5 +1,6 @@
 import express = require("express");
 import multer = require("multer");
+const auth = require("../middleware/auth");
 const { ImportService } = require("../services/importService");
 
 const router = express.Router();
@@ -7,11 +8,13 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 const importService = new ImportService();
 
+router.use(auth);
+
 // POST /api/imports
 router.post(
     "/",
     upload.single("file"),
-    async (req: express.Request, res: express.Response) => {
+    async (req: any, res: express.Response) => {
         try {
             if (!req.file) {
                 res.status(400).json({ error: "No file uploaded" });
@@ -22,26 +25,28 @@ router.post(
             const accountId = req.body.accountId;
             const format = req.body.format || "ofx";
             const dateFormat = req.body.dateFormat;
+            const userId = req.user.id;
 
             let result;
             if (format.toLowerCase() === "qif") {
                 result = await importService.importQif(
                     fileContent,
+                    userId,
                     accountId,
                     dateFormat,
                 );
             } else {
-                result = await importService.importOfx(fileContent, accountId);
+                result = await importService.importOfx(fileContent, userId, accountId);
             }
 
             res.json({
                 message: "Import processed successfully",
                 data: result,
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error processing import:", error);
             res.status(500).json({
-                error: "Internal server error processing file",
+                error: error.message || "Internal server error processing file",
             });
         }
     },

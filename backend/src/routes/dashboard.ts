@@ -63,11 +63,13 @@ async function getSummary(startDate: string, endDate: string, userId: string) {
 
     const { rows } = await query(sql, [startDate, endDate, userId]);
     const summary = rows[0];
-    const variance = summary.totalBudget + summary.totalSpend;
+    const totalBudget = parseFloat(summary.totalBudget);
+    const totalSpend = parseFloat(summary.totalSpend);
+    const variance = totalBudget + totalSpend;
 
     return {
-        totalSpend: parseFloat(summary.totalSpend),
-        totalBudget: parseFloat(summary.totalBudget),
+        totalSpend,
+        totalBudget,
         variance: parseFloat(variance.toFixed(2)),
     };
 }

@@ -18,8 +18,9 @@ const auth = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const apiKey = req.header("X-API-Key");
     if (apiKey) {
         try {
-            // Hash the provided key to compare with the stored hash
-            const keyHash = crypto.createHash("sha256").update(apiKey).digest("hex");
+            // Use the same hashing logic as registration (SHA-256 + salt)
+            const salt = process.env.JWT_SECRET || "voseknows_salt";
+            const keyHash = crypto.createHash("sha256").update(apiKey + salt).digest("hex");
 
             const result = await query(
                 "SELECT user_id FROM api_keys WHERE key_hash = $1",

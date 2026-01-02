@@ -70,7 +70,7 @@ const SettingsPage: React.FC = () => {
         if (!newKeyName) return;
         setLoading(true);
         try {
-            const res = await apiClient.post("/api/settings/api-keys", { name: newKeyName });
+            const res = await apiClient.post("/settings/api-keys", { name: newKeyName });
             setGeneratedKey(res.data.key);
             setNewKeyName("");
             fetchSettings();

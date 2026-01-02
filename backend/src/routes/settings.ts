@@ -56,9 +56,12 @@ router.post("/api-keys", async (req: any, res: Response) => {
 
     try {
         // Generate a random key
-        const rawKey = `vk_live_${crypto.randomBytes(24).toString("hex")}`;
-        const keyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
-        const keyHint = rawKey.substring(0, 7) + "...";
+        const rawKey = `vk_${crypto.randomBytes(24).toString("hex")}`;
+        // Use SHA-256 with a salt (secure and fast for repeated API auth)
+        const salt = process.env.JWT_SECRET || "voseknows_salt";
+        const keyHash = crypto.createHash("sha256").update(rawKey + salt).digest("hex");
+        // Create a more useful hint: vk_...hash
+        const keyHint = `vk_...${rawKey.substring(rawKey.length - 4)}`;
 
         await query(
             "INSERT INTO api_keys (user_id, name, key_hash, key_hint) VALUES ($1, $2, $3, $4)",

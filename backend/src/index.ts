@@ -18,6 +18,8 @@ const budgetRoutes = require("./routes/budgets");
 const reportRoutes = require("./routes/reports");
 const authRoutes = require("./routes/auth");
 const settingsRoutes = require("./routes/settings");
+const dashboardRoutes = require("./routes/dashboard");
+const externalRoutes = require("./routes/external");
 
 // Configure dotenv to read .env file
 dotenv.config();
@@ -43,6 +45,8 @@ app.use("/api/budgets", budgetRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/external", externalRoutes);
 
 // A simple root route to confirm the server is running
 app.get("/", (req: Request, res: Response) => {
