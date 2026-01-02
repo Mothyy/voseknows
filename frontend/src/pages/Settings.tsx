@@ -233,9 +233,9 @@ const SettingsPage: React.FC = () => {
                                         </Button>
                                     </div>
                                     <Button
-                                        variant="outline"
+                                        variant="ghost"
                                         size="sm"
-                                        className="mt-2 border-slate-700 hover:bg-slate-800 text-slate-300 h-8 text-[10px]"
+                                        className="mt-2 border border-slate-700 hover:bg-slate-800 hover:text-white text-slate-400 h-8 text-[10px]"
                                         onClick={() => setGeneratedKey(null)}
                                     >
                                         I have saved it securely
