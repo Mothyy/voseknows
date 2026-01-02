@@ -43,19 +43,22 @@ const RegisterPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+            {/* Background decorative elements */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600" />
+            <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse" />
 
-            <Card className="w-full max-w-md shadow-2xl border-none ring-1 ring-black/5">
+            <Card className="w-full max-w-md shadow-2xl border-border bg-card relative z-10 transition-all duration-500">
                 <CardHeader className="space-y-4 pt-8 text-center">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-200 ring-4 ring-blue-50">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-200 dark:shadow-blue-900/20 ring-4 ring-blue-50 dark:ring-blue-900/20">
                         <Wallet className="h-8 w-8 text-white" />
                     </div>
                     <div className="space-y-2">
-                        <CardTitle className="text-3xl font-bold tracking-tight text-slate-900">
+                        <CardTitle className="text-3xl font-bold tracking-tight text-foreground">
                             Create Account
                         </CardTitle>
-                        <CardDescription className="text-slate-500 text-base">
+                        <CardDescription className="text-muted-foreground text-base">
                             Start managing your finances with confidence
                         </CardDescription>
                     </div>
@@ -64,20 +67,20 @@ const RegisterPage: React.FC = () => {
                 <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-5 px-8">
                         {error && (
-                            <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-900">
+                            <Alert variant="destructive" className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/30 text-red-900 dark:text-red-400">
                                 <AlertDescription>{error}</AlertDescription>
                             </Alert>
                         )}
 
                         <div className="space-y-2">
-                            <Label htmlFor="email" className="text-sm font-semibold text-slate-700">Email Address</Label>
+                            <Label htmlFor="email" className="text-sm font-semibold text-foreground/70">Email Address</Label>
                             <div className="relative group">
-                                <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-blue-600" />
+                                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-blue-600" />
                                 <Input
                                     id="email"
                                     type="email"
                                     placeholder="name@example.com"
-                                    className="pl-10 h-11 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all"
+                                    className="pl-10 h-11 border-input bg-background focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
@@ -86,14 +89,14 @@ const RegisterPage: React.FC = () => {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="password" className="text-sm font-semibold text-slate-700">Password</Label>
+                            <Label htmlFor="password" className="text-sm font-semibold text-foreground/70">Password</Label>
                             <div className="relative group">
-                                <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-blue-600" />
+                                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-blue-600" />
                                 <Input
                                     id="password"
                                     type="password"
                                     placeholder="Min. 8 characters"
-                                    className="pl-10 h-11 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all"
+                                    className="pl-10 h-11 border-input bg-background focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
@@ -102,14 +105,14 @@ const RegisterPage: React.FC = () => {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="confirmPassword" className="text-sm font-semibold text-slate-700">Confirm Password</Label>
+                            <Label htmlFor="confirmPassword" className="text-sm font-semibold text-foreground/70">Confirm Password</Label>
                             <div className="relative group">
-                                <ShieldCheck className="absolute left-3 top-3 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-blue-600" />
+                                <ShieldCheck className="absolute left-3 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-blue-600" />
                                 <Input
                                     id="confirmPassword"
                                     type="password"
                                     placeholder="••••••••"
-                                    className="pl-10 h-11 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all"
+                                    className="pl-10 h-11 border-input bg-background focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     required
@@ -120,7 +123,7 @@ const RegisterPage: React.FC = () => {
 
                     <CardFooter className="flex flex-col space-y-4 px-8 pb-10 pt-6">
                         <Button
-                            className="w-full h-11 text-base font-semibold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 active:scale-[0.98] transition-all"
+                            className="w-full h-11 text-base font-semibold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/10 active:scale-[0.98] transition-all"
                             type="submit"
                             disabled={isSubmitting}
                         >
@@ -137,7 +140,7 @@ const RegisterPage: React.FC = () => {
                             )}
                         </Button>
 
-                        <p className="text-center text-sm text-slate-500">
+                        <p className="text-center text-sm text-muted-foreground">
                             Already have an account?{" "}
                             <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700 underline-offset-4 hover:underline">
                                 Sign in

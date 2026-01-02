@@ -20,6 +20,9 @@ import {
     Activity
 } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { useTheme } from "../contexts/ThemeContext";
+import { Sun, Moon, Monitor, Laptop } from "lucide-react";
 
 interface APIKey {
     id: string;
@@ -31,6 +34,7 @@ interface APIKey {
 
 const SettingsPage: React.FC = () => {
     const { user, refreshUser } = useAuth();
+    const { theme, setTheme } = useTheme();
     const [timeoutMinutes, setTimeoutMinutes] = useState<number>(user?.session_timeout_minutes || 60);
     const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
     const [newKeyName, setNewKeyName] = useState("");
@@ -99,11 +103,11 @@ const SettingsPage: React.FC = () => {
     return (
         <div className="space-y-8 max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
                     <ShieldCheck className="h-8 w-8 text-indigo-600" />
                     Security Settings
                 </h1>
-                <p className="text-slate-500 mt-2">Manage your account security, session persistence, and developer access.</p>
+                <p className="text-muted-foreground mt-2">Manage your account security, session persistence, and developer access.</p>
             </div>
 
             {successMsg && (
@@ -115,7 +119,7 @@ const SettingsPage: React.FC = () => {
 
             <div className="grid gap-8 md:grid-cols-2">
                 {/* Session Timeout Settings */}
-                <Card className="shadow-md border-slate-200">
+                <Card className="shadow-md border-border">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Clock className="h-5 w-5 text-indigo-600" />
@@ -136,14 +140,14 @@ const SettingsPage: React.FC = () => {
                                 className="h-11"
                             />
                         </div>
-                        <Alert className="bg-amber-50 border-amber-200 text-amber-900 border-dashed">
-                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 border-dashed">
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
                             <AlertDescription className="text-xs">
                                 Shorter timeouts are more secure but less convenient for frequent use.
                             </AlertDescription>
                         </Alert>
                     </CardContent>
-                    <CardFooter className="bg-slate-50/50 border-t py-3">
+                    <CardFooter className="bg-muted/50 border-t border-border py-3">
                         <Button
                             className="bg-indigo-600 hover:bg-indigo-700 w-full"
                             onClick={updateTimeout}
@@ -155,7 +159,7 @@ const SettingsPage: React.FC = () => {
                 </Card>
 
                 {/* Profile Overview */}
-                <Card className="shadow-md border-slate-200 flex flex-col">
+                <Card className="shadow-md border-border flex flex-col">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <User className="h-5 w-5 text-indigo-600" />
@@ -166,16 +170,86 @@ const SettingsPage: React.FC = () => {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex-1 flex flex-col justify-center items-center text-center space-y-4">
-                        <div className="h-20 w-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-indigo-200">
+                        <div className="h-20 w-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30">
                             {user?.email.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                            <p className="font-bold text-lg text-slate-900">{user?.email}</p>
-                            <p className="text-slate-500 text-sm">Protected by Industry Standard Encryption</p>
+                            <p className="font-bold text-lg text-foreground">{user?.email}</p>
+                            <p className="text-muted-foreground text-sm">Protected by Industry Standard Encryption</p>
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Appearance Settings */}
+            <Card className="shadow-md border-border overflow-hidden">
+                <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2">
+                        <Laptop className="h-5 w-5 text-indigo-600" />
+                        Appearance
+                    </CardTitle>
+                    <CardDescription>
+                        Customize how the interface looks on your device.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <button
+                            onClick={() => setTheme("light")}
+                            className={cn(
+                                "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
+                                theme === "light"
+                                    ? "bg-indigo-50/50 border-indigo-600 ring-2 ring-indigo-600/10"
+                                    : "bg-background border-border hover:border-indigo-200"
+                            )}
+                        >
+                            <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                                <Sun className="h-6 w-6" />
+                            </div>
+                            <div className="text-center">
+                                <p className="font-semibold text-sm">Light</p>
+                                <p className="text-[10px] text-muted-foreground">Classic brightness</p>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => setTheme("dark")}
+                            className={cn(
+                                "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
+                                theme === "dark"
+                                    ? "bg-slate-900 border-indigo-600 ring-2 ring-indigo-600/10"
+                                    : "bg-background border-border hover:border-indigo-200"
+                            )}
+                        >
+                            <div className="h-12 w-12 rounded-full bg-indigo-900 flex items-center justify-center text-indigo-300">
+                                <Moon className="h-6 w-6" />
+                            </div>
+                            <div className="text-center">
+                                <p className="font-semibold text-sm">Dark</p>
+                                <p className="text-[10px] text-muted-foreground">Easy on the eyes</p>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => setTheme("system")}
+                            className={cn(
+                                "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
+                                theme === "system"
+                                    ? "bg-slate-100 dark:bg-slate-800 border-indigo-600 ring-2 ring-indigo-600/10"
+                                    : "bg-background border-border hover:border-indigo-200"
+                            )}
+                        >
+                            <div className="h-12 w-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300">
+                                <Monitor className="h-6 w-6" />
+                            </div>
+                            <div className="text-center">
+                                <p className="font-semibold text-sm">System</p>
+                                <p className="text-[10px] text-muted-foreground">Sync with device</p>
+                            </div>
+                        </button>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* API Key Management */}
             <Card className="shadow-md border-slate-200">
@@ -213,20 +287,20 @@ const SettingsPage: React.FC = () => {
                     </div>
 
                     {generatedKey && (
-                        <Alert className="bg-slate-900 text-white border-none shadow-xl animate-in slide-in-from-top-4 duration-300">
+                        <Alert className="bg-card text-foreground border border-border shadow-xl animate-in slide-in-from-top-4 duration-300">
                             <Key className="h-4 w-4 text-emerald-400" />
                             <div className="w-full flex flex-col gap-2">
                                 <AlertTitle className="text-emerald-400 font-bold">New Secret Key Generated!</AlertTitle>
                                 <AlertDescription>
-                                    <p className="text-slate-300 text-xs mb-2">
+                                    <p className="text-muted-foreground text-xs mb-2">
                                         Copy this key now. We store only a cryptographic hash, so you will never be able to see this value again.
                                     </p>
-                                    <div className="flex items-center gap-2 bg-slate-800 p-3 rounded-lg border border-slate-700">
-                                        <code className="flex-1 font-mono text-emerald-100 break-all">{generatedKey}</code>
+                                    <div className="flex items-center gap-2 bg-muted p-3 rounded-lg border border-border">
+                                        <code className="flex-1 font-mono text-foreground break-all">{generatedKey}</code>
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="text-slate-400 hover:text-white hover:bg-slate-700"
+                                            className="text-muted-foreground hover:text-foreground hover:bg-muted"
                                             onClick={() => copyToClipboard(generatedKey)}
                                         >
                                             <Copy className="h-4 w-4" />
@@ -235,7 +309,7 @@ const SettingsPage: React.FC = () => {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="mt-2 border border-slate-700 hover:bg-slate-800 hover:text-white text-slate-400 h-8 text-[10px]"
+                                        className="mt-2 border border-border hover:bg-muted hover:text-foreground text-muted-foreground h-8 text-[10px]"
                                         onClick={() => setGeneratedKey(null)}
                                     >
                                         I have saved it securely
@@ -246,9 +320,9 @@ const SettingsPage: React.FC = () => {
                     )}
 
                     {/* Existing Keys List */}
-                    <div className="rounded-lg border border-slate-100 overflow-hidden">
+                    <div className="rounded-lg border border-border overflow-hidden">
                         <table className="w-full text-sm">
-                            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
+                            <thead className="bg-muted border-b border-border text-muted-foreground font-medium">
                                 <tr>
                                     <th className="text-left py-3 px-4 font-semibold">Name</th>
                                     <th className="text-left py-3 px-4 font-semibold">Hint</th>
@@ -257,23 +331,23 @@ const SettingsPage: React.FC = () => {
                                     <th className="text-right py-3 px-4 font-semibold">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-border">
                                 {apiKeys.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="py-8 text-center text-slate-400 italic">
+                                        <td colSpan={5} className="py-8 text-center text-muted-foreground italic">
                                             No API keys generated yet.
                                         </td>
                                     </tr>
                                 ) : (
                                     apiKeys.map((key) => (
-                                        <tr key={key.id} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="py-3 px-4 font-medium text-slate-900">{key.name}</td>
-                                            <td className="py-3 px-4"><code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">{key.key_hint}</code></td>
-                                            <td className="py-3 px-4 text-slate-500 flex items-center gap-1.5">
+                                        <tr key={key.id} className="hover:bg-muted/50 transition-colors">
+                                            <td className="py-3 px-4 font-medium text-foreground">{key.name}</td>
+                                            <td className="py-3 px-4"><code className="bg-muted px-1.5 py-0.5 rounded text-xs">{key.key_hint}</code></td>
+                                            <td className="py-3 px-4 text-muted-foreground flex items-center gap-1.5">
                                                 <Calendar className="h-3 w-3" />
                                                 {format(new Date(key.created_at), "MMM d, yyyy")}
                                             </td>
-                                            <td className="py-3 px-4 text-slate-500">
+                                            <td className="py-3 px-4 text-muted-foreground">
                                                 {key.last_used_at ? (
                                                     <div className="flex items-center gap-1.5 text-emerald-600 font-medium whitespace-nowrap">
                                                         <Activity className="h-3 w-3" />
@@ -287,7 +361,7 @@ const SettingsPage: React.FC = () => {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                    className="text-muted-foreground hover:text-red-600 hover:bg-red-500/10"
                                                     onClick={() => deleteApiKey(key.id)}
                                                 >
                                                     <Trash2 className="h-4 w-4" />

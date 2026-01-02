@@ -21,53 +21,56 @@ const GenericPage = ({ title }: { title: string }) => (
 );
 
 import { AuthProvider } from "./contexts/AuthContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import LoginPage from "./pages/Login";
 import RegisterPage from "./pages/Register";
 
 function App() {
     return (
-        <AuthProvider>
-            <Router>
-                <Routes>
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route path="/register" element={<RegisterPage />} />
+        <ThemeProvider defaultTheme="light" storageKey="voseknows-ui-theme">
+            <AuthProvider>
+                <Router>
+                    <Routes>
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/register" element={<RegisterPage />} />
 
-                    <Route
-                        path="/"
-                        element={
-                            <ProtectedRoute>
-                                <MainLayout />
-                            </ProtectedRoute>
-                        }
-                    >
-                        <Route index element={<Dashboard />} />
-                        <Route path="transactions" element={<Transactions />} />
-                        <Route path="accounts" element={<AccountsPage />} />
                         <Route
-                            path="accounts/:id"
-                            element={<AccountDetailPage />}
-                        />
-                        <Route path="categories" element={<Categories />} />
-                        <Route path="budgets" element={<Budget />} />
-                        <Route path="reports" element={<ReportsPage />} />
-                        <Route
-                            path="settings/profile"
-                            element={<SettingsPage />}
-                        />
-                        <Route
-                            path="settings/preferences"
-                            element={<SettingsPage />}
-                        />
-                        <Route path="connections" element={<ConnectionsPage />} />
-                        <Route
-                            path="*"
-                            element={<GenericPage title="404 - Not Found" />}
-                        />
-                    </Route>
-                </Routes>
-            </Router>
-        </AuthProvider>
+                            path="/"
+                            element={
+                                <ProtectedRoute>
+                                    <MainLayout />
+                                </ProtectedRoute>
+                            }
+                        >
+                            <Route index element={<Dashboard />} />
+                            <Route path="transactions" element={<Transactions />} />
+                            <Route path="accounts" element={<AccountsPage />} />
+                            <Route
+                                path="accounts/:id"
+                                element={<AccountDetailPage />}
+                            />
+                            <Route path="categories" element={<Categories />} />
+                            <Route path="budgets" element={<Budget />} />
+                            <Route path="reports" element={<ReportsPage />} />
+                            <Route
+                                path="settings/profile"
+                                element={<SettingsPage />}
+                            />
+                            <Route
+                                path="settings/preferences"
+                                element={<SettingsPage />}
+                            />
+                            <Route path="connections" element={<ConnectionsPage />} />
+                            <Route
+                                path="*"
+                                element={<GenericPage title="404 - Not Found" />}
+                            />
+                        </Route>
+                    </Routes>
+                </Router>
+            </AuthProvider>
+        </ThemeProvider>
     );
 }
 

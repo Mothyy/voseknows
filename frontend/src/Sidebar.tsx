@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import * as icons from "lucide-react";
 import navConfig from "@/nav.json";
+import { ThemeToggle } from "./components/ThemeToggle";
 
 // Define the types for our navigation configuration
 type NavItemChild = {
@@ -81,19 +82,17 @@ export const Sidebar = () => {
                 <div
                     className={cn(
                         "flex items-center gap-2 overflow-hidden transition-all duration-300",
-                        isCollapsed ? "w-8 justify-center" : "w-auto",
+                        isCollapsed ? "w-8 justify-center" : "w-auto flex-1",
                     )}
                 >
                     <icons.HandCoins className="h-8 w-8 shrink-0 text-primary" />
-                    <h1
-                        className={cn(
-                            "whitespace-nowrap text-lg font-bold transition-opacity duration-300",
-                            isCollapsed ? "opacity-0 w-0" : "opacity-100",
-                        )}
-                    >
-                        VoseKnows
-                    </h1>
+                    {!isCollapsed && (
+                        <h1 className="whitespace-nowrap text-lg font-bold">
+                            VoseKnows
+                        </h1>
+                    )}
                 </div>
+                {!isCollapsed && <ThemeToggle />}
             </div>
 
             {/* Navigation */}

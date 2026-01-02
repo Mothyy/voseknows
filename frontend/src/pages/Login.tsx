@@ -36,19 +36,22 @@ const LoginPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+            {/* Background decorative elements */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600" />
+            <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
 
-            <Card className="w-full max-w-md shadow-2xl border-none ring-1 ring-black/5">
+            <Card className="w-full max-w-md shadow-2xl border-border bg-card relative z-10 transition-all duration-500">
                 <CardHeader className="space-y-4 pt-8 text-center">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-200 ring-4 ring-indigo-50">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20 ring-4 ring-indigo-50 dark:ring-indigo-900/20">
                         <Wallet className="h-8 w-8 text-white" />
                     </div>
                     <div className="space-y-2">
-                        <CardTitle className="text-3xl font-bold tracking-tight text-slate-900">
+                        <CardTitle className="text-3xl font-bold tracking-tight text-foreground">
                             Welcome Back
                         </CardTitle>
-                        <CardDescription className="text-slate-500 text-base">
+                        <CardDescription className="text-muted-foreground text-base">
                             Enter your credentials to access your dashboard
                         </CardDescription>
                     </div>
@@ -62,15 +65,15 @@ const LoginPage: React.FC = () => {
                             </Alert>
                         )}
 
-                        <div className="space-y-2">
-                            <Label htmlFor="email" className="text-sm font-semibold text-slate-700">Email Address</Label>
+                        <div class="space-y-2">
+                            <Label htmlFor="email" className="text-sm font-semibold text-foreground/70">Email Address</Label>
                             <div className="relative group">
-                                <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-indigo-600" />
+                                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-indigo-600" />
                                 <Input
                                     id="email"
                                     type="email"
                                     placeholder="name@example.com"
-                                    className="pl-10 h-11 border-slate-200 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all"
+                                    className="pl-10 h-11 border-input bg-background focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
@@ -80,15 +83,15 @@ const LoginPage: React.FC = () => {
 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <Label htmlFor="password" className="text-sm font-semibold text-slate-700">Password</Label>
+                                <Label htmlFor="password" className="text-sm font-semibold text-foreground/70">Password</Label>
                             </div>
                             <div className="relative group">
-                                <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-indigo-600" />
+                                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-indigo-600" />
                                 <Input
                                     id="password"
                                     type="password"
                                     placeholder="••••••••"
-                                    className="pl-10 h-11 border-slate-200 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all"
+                                    className="pl-10 h-11 border-input bg-background focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
@@ -116,7 +119,7 @@ const LoginPage: React.FC = () => {
                             )}
                         </Button>
 
-                        <p className="text-center text-sm text-slate-500">
+                        <p className="text-center text-sm text-muted-foreground">
                             Don't have an account?{" "}
                             <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-700 underline-offset-4 hover:underline">
                                 Create an account
