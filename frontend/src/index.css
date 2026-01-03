@@ -50,10 +50,28 @@
 }
 
 @layer base {
-    * {
+
+    *,
+    *::before,
+    *::after {
         @apply border-border;
+        transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+            color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+            border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+            fill 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+            stroke 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+            box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
+
     body {
         @apply bg-background text-foreground;
+    }
+
+    /* Prevent transitions on page load or when specifically requested */
+    .no-transitions,
+    .no-transitions *,
+    .no-transitions *::before,
+    .no-transitions *::after {
+        transition: none !important;
     }
 }

@@ -17,11 +17,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode; defaultTheme?:
     const [theme, setTheme] = useState<Theme>(
         () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
     );
+    const [isLoaded, setIsLoaded] = useState(false);
 
     useEffect(() => {
         const root = window.document.documentElement;
 
-        const applyTheme = (currentTheme: Theme) => {
+        const applyTheme = (currentTheme: Theme, skipTransition: boolean) => {
+            if (skipTransition) {
+                root.classList.add("no-transitions");
+            }
+
             root.classList.remove("light", "dark");
 
             if (currentTheme === "system") {
@@ -32,19 +37,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode; defaultTheme?:
             } else {
                 root.classList.add(currentTheme);
             }
+
+            if (skipTransition) {
+                // Force a reflow
+                void root.offsetHeight;
+                root.classList.remove("no-transitions");
+            }
         };
 
-        applyTheme(theme);
+        applyTheme(theme, !isLoaded);
+        if (!isLoaded) setIsLoaded(true);
 
         // Add listener for system theme changes
         if (theme === "system") {
             const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-            const handleChange = () => applyTheme("system");
+            const handleChange = () => applyTheme("system", false); // Transitions for system changes too? Maybe.
 
             mediaQuery.addEventListener("change", handleChange);
             return () => mediaQuery.removeEventListener("change", handleChange);
         }
-    }, [theme]);
+    }, [theme, isLoaded]);
 
     const value = {
         theme,
