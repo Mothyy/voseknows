@@ -1,0 +1,8 @@
+playwright==1.42.0
+python-dotenv==1.0.0
+pandas==2.0.3
+pyyaml>=6.0.1
+requests==2.31.0
+actualpy>=0.3.0  # Official Actual Budget Python client
+ofxparse==0.21
+qifparse==0.5

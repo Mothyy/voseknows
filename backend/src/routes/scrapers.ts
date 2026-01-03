@@ -1,0 +1,164 @@
+import express from "express";
+const router = express.Router();
+import { query } from "../db";
+import { encrypt } from "../lib/encryption";
+const auth = require("../middleware/auth");
+import { runScraper } from "../services/scraperWorker";
+import { Response } from "express";
+
+// Apply auth middleware to all routes
+router.use(auth);
+
+// @route   GET /api/scrapers
+// @desc    Get all available scrapers
+router.get("/", async (req: any, res: Response) => {
+    try {
+        const { rows } = await query("SELECT * FROM scrapers", []);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch scrapers" });
+    }
+});
+
+// @route   GET /api/scrapers/connections
+router.get("/connections", async (req: any, res: Response) => {
+    try {
+        const { rows } = await query(
+            `SELECT c.id, c.name, c.status, c.last_run_at, c.last_error, c.account_id, c.date_format, c.encrypted_metadata,
+                    s.name as scraper_name, s.slug as scraper_slug,
+                    a.name as target_account_name
+             FROM automated_connections c
+             JOIN scrapers s ON c.scraper_id = s.id
+             LEFT JOIN accounts a ON c.account_id = a.id
+             WHERE c.user_id = $1`,
+            [req.user.id]
+        );
+        res.json(rows);
+    } catch (err: any) {
+        console.error("Fetch Connections Error:", err);
+        if (err.stack) console.error(err.stack);
+        res.status(500).json({ error: "Failed to fetch connections", details: err.message });
+    }
+});
+
+router.post("/connections", async (req: any, res: Response) => {
+    const { scraper_id, account_id, name, username, password, metadata, date_format } = req.body;
+
+    if (!scraper_id || !name || !username || !password) {
+        return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    try {
+        const encryptedUsername = encrypt(username);
+        const encryptedPassword = encrypt(password);
+        const encryptedMetadata = metadata ? encrypt(JSON.stringify(metadata)) : null;
+
+        const { rows } = await query(
+            `INSERT INTO automated_connections 
+             (user_id, scraper_id, account_id, name, encrypted_username, encrypted_password, encrypted_metadata, date_format)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING id, name, status, created_at`,
+            [req.user.id, scraper_id, account_id || null, name, encryptedUsername, encryptedPassword, encryptedMetadata, date_format || 'YYYY-MM-DD']
+        );
+
+        res.status(201).json(rows[0]);
+    } catch (err) {
+        console.error("Connection Creation Error:", err);
+        res.status(500).json({ error: "Failed to create connection" });
+    }
+});
+
+// @route   PUT /api/scrapers/connections/:id
+router.put("/connections/:id", async (req: any, res: Response) => {
+    const { id } = req.params;
+    const { name, username, password, account_id, date_format, metadata } = req.body;
+
+    try {
+        // Fetch current values
+        const current = await query("SELECT * FROM automated_connections WHERE id = $1 AND user_id = $2", [id, req.user.id]);
+        if (current.rows.length === 0) return res.status(404).json({ error: "Connection not found" });
+
+        const conn = current.rows[0];
+
+        const updateName = name || conn.name;
+        const updateUsername = username ? encrypt(username) : conn.encrypted_username;
+        const updatePassword = password ? encrypt(password) : conn.encrypted_password;
+        const updateAccountId = account_id !== undefined ? account_id : conn.account_id;
+        const updateDateFormat = date_format || conn.date_format;
+        const updateMetadata = metadata ? encrypt(JSON.stringify(metadata)) : conn.encrypted_metadata;
+
+        const { rows } = await query(
+            `UPDATE automated_connections 
+             SET name = $1, encrypted_username = $2, encrypted_password = $3, 
+                 account_id = $4, date_format = $5, encrypted_metadata = $6
+             WHERE id = $7 AND user_id = $8
+             RETURNING id, name, status`,
+            [updateName, updateUsername, updatePassword, updateAccountId, updateDateFormat, updateMetadata, id, req.user.id]
+        );
+
+        res.json(rows[0]);
+    } catch (err) {
+        console.error("Update Connection Error:", err);
+        res.status(500).json({ error: "Failed to update connection" });
+    }
+});
+
+router.delete("/connections/:id", async (req: any, res: Response) => {
+    try {
+        await query("DELETE FROM scraping_schedules WHERE connection_id = $1", [req.params.id]);
+        await query("DELETE FROM automated_connections WHERE id = $1 AND user_id = $2", [req.params.id, req.user.id]);
+        res.json({ message: "Connection deleted" });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to delete connection" });
+    }
+});
+
+router.post("/connections/:id/schedule", async (req: any, res: Response) => {
+    const { frequency, is_active } = req.body;
+    const connectionId = req.params.id;
+
+    if (!frequency) return res.status(400).json({ error: "Frequency is required" });
+
+    try {
+        // Check if schedule exists
+        const check = await query("SELECT id FROM scraping_schedules WHERE connection_id = $1", [connectionId]);
+
+        if (check.rows.length > 0) {
+            const { rows } = await query(
+                `UPDATE scraping_schedules 
+                 SET frequency = $1, is_active = $2, next_run_at = NOW() 
+                 WHERE connection_id = $3 
+                 RETURNING *`,
+                [frequency, is_active !== undefined ? is_active : true, connectionId]
+            );
+            res.json(rows[0]);
+        } else {
+            const { rows } = await query(
+                `INSERT INTO scraping_schedules (connection_id, frequency, is_active, next_run_at)
+                 VALUES ($1, $2, $3, NOW())
+                 RETURNING *`,
+                [connectionId, frequency, is_active !== undefined ? is_active : true]
+            );
+            res.status(201).json(rows[0]);
+        }
+    } catch (err) {
+        res.status(500).json({ error: "Failed to update schedule" });
+    }
+});
+
+router.post("/connections/:id/run", async (req: any, res: Response) => {
+    try {
+        // Check if it belongs to user
+        const check = await query("SELECT id FROM automated_connections WHERE id = $1 AND user_id = $2", [req.params.id, req.user.id]);
+        if (check.rows.length === 0) return res.status(404).json({ error: "Connection not found" });
+
+        // Trigger scraper (don't await for it to finish)
+        runScraper(req.params.id);
+
+        res.json({ message: "Scraper triggered successfully" });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to trigger scraper" });
+    }
+});
+
+export default router;

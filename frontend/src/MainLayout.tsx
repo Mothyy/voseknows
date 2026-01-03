@@ -8,7 +8,7 @@ import { useEffect } from "react";
 
 const MainLayout: React.FC = () => {
     const { user } = useAuth();
-    const { theme, setTheme } = useTheme();
+    const { setTheme } = useTheme();
 
     // Sync theme with user preference ONLY ONCE when they log in
     useEffect(() => {

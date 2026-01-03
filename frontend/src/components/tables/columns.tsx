@@ -5,7 +5,6 @@ import { ColumnDef, Row, Table } from "@tanstack/react-table";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 import apiClient from "@/lib/api";
 import type { Transaction } from "@/data/transactions";
-import type { Category } from "@/pages/Categories";
 
 import { CategorySelector } from "@/components/category-selector";
 import { Button } from "@/components/ui/button";

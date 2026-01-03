@@ -102,7 +102,6 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                 const mtdStart = format(startOfMonth(subMonths(startDate, periodCount - 1)), "yyyy-MM-dd");
                 const mtdEnd = format(endOfMonth(startDate), "yyyy-MM-dd");
                 const ytdStart = format(startOfYear(startDate), "yyyy-MM-dd");
-                const ytdEnd = mtdEnd;
 
                 // Initialize merged structure
                 const mergedMap = new Map<string, MergedBudgetRecord>(
@@ -509,7 +508,7 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                 <div className="flex items-center gap-2">
                     {!isEditing ? (
                         <Button
-                            variant="primary"
+                            variant="default"
                             size="sm"
                             onClick={() => {
                                 setViewMode("compare");

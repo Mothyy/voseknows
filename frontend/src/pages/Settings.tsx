@@ -4,7 +4,7 @@ import apiClient from "../lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
     Key,
@@ -14,15 +14,16 @@ import {
     Copy,
     Plus,
     ShieldCheck,
-    AlertTriangle,
     CheckCircle2,
     Calendar,
-    Activity
+    Activity,
+    Sun,
+    Moon,
+    Monitor,
 } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import { useTheme } from "../contexts/ThemeContext";
-import { Sun, Moon, Monitor, Laptop } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface APIKey {
     id: string;
@@ -101,113 +102,105 @@ const SettingsPage: React.FC = () => {
     };
 
     return (
-        <div className="space-y-8 max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-                    <ShieldCheck className="h-8 w-8 text-indigo-600" />
-                    Security Settings
-                </h1>
-                <p className="text-muted-foreground mt-2">Manage your account security, session persistence, and developer access.</p>
+        <div className="space-y-6 max-w-4xl mx-auto">
+            <div className="flex flex-col gap-1">
+                <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+                <p className="text-muted-foreground">Manage your account preferences and security.</p>
             </div>
 
             {successMsg && (
-                <Alert className="bg-emerald-50 border-emerald-200 text-emerald-900 animate-in zoom-in duration-300">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    <AlertDescription className="font-medium">{successMsg}</AlertDescription>
+                <Alert className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <AlertTitle>Success</AlertTitle>
+                    <AlertDescription>{successMsg}</AlertDescription>
                 </Alert>
             )}
 
-            <div className="grid gap-8 md:grid-cols-2">
-                {/* Session Timeout Settings */}
-                <Card className="shadow-md border-border">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Clock className="h-5 w-5 text-indigo-600" />
-                            Session Timeout
-                        </CardTitle>
-                        <CardDescription>
-                            Define how long you stay logged in before a new login is required.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="timeout">Minutes until auto-logout</Label>
+            {/* Account Profile Card */}
+            <Card className="shadow-md border-slate-200">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <User className="h-5 w-5 text-indigo-600" />
+                        Account Profile
+                    </CardTitle>
+                    <CardDescription>
+                        Details about your user account.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <Label className="text-slate-500">Email Address</Label>
+                            <p className="font-medium text-slate-900 dark:text-slate-100">{user?.email}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-slate-500">Account ID</Label>
+                            <p className="font-mono text-xs text-slate-400 truncate">{user?.id}</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Session Security Card */}
+            <Card className="shadow-md border-slate-200">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <ShieldCheck className="h-5 w-5 text-indigo-600" />
+                        Security & Session
+                    </CardTitle>
+                    <CardDescription>
+                        Configure how long your session stays active.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex flex-col md:flex-row md:items-end gap-4 max-w-md">
+                        <div className="flex-1 space-y-2">
+                            <Label htmlFor="timeout" className="flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                Session Timeout (minutes)
+                            </Label>
                             <Input
                                 id="timeout"
                                 type="number"
                                 value={timeoutMinutes}
                                 onChange={(e) => setTimeoutMinutes(parseInt(e.target.value))}
+                                min={5}
+                                max={1440}
                                 className="h-11"
                             />
                         </div>
-                        <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 border-dashed">
-                            <AlertTriangle className="h-4 w-4 text-amber-500" />
-                            <AlertDescription className="text-xs">
-                                Shorter timeouts are more secure but less convenient for frequent use.
-                            </AlertDescription>
-                        </Alert>
-                    </CardContent>
-                    <CardFooter className="bg-muted/50 border-t border-border py-3">
                         <Button
-                            className="bg-indigo-600 hover:bg-indigo-700 w-full"
                             onClick={updateTimeout}
+                            className="h-11 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900"
                             disabled={loading}
                         >
-                            Save Preferences
+                            Update
                         </Button>
-                    </CardFooter>
-                </Card>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-2">
+                        Minimum 5 minutes, maximum 1440 minutes (24 hours).
+                    </p>
+                </CardContent>
+            </Card>
 
-                {/* Profile Overview */}
-                <Card className="shadow-md border-border flex flex-col">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <User className="h-5 w-5 text-indigo-600" />
-                            Account Profile
-                        </CardTitle>
-                        <CardDescription>
-                            Your current identity in the system.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-1 flex flex-col justify-center items-center text-center space-y-4">
-                        <div className="h-20 w-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30">
-                            {user?.email.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                            <p className="font-bold text-lg text-foreground">{user?.email}</p>
-                            <p className="text-muted-foreground text-sm">Protected by Industry Standard Encryption</p>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Appearance Settings */}
-            <Card className="shadow-md border-border overflow-hidden">
-                <CardHeader className="pb-3">
+            {/* Appearance Card */}
+            <Card className="shadow-md border-slate-200">
+                <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <Laptop className="h-5 w-5 text-indigo-600" />
+                        <Sun className="h-5 w-5 text-indigo-600" />
                         Appearance
                     </CardTitle>
                     <CardDescription>
-                        Customize how the interface looks on your device.
+                        Personalize the look and feel of your dashboard.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <button
-                            onClick={async () => {
-                                setTheme("light");
-                                try {
-                                    await apiClient.post("/settings/theme", { theme: "light" });
-                                } catch (err) {
-                                    console.error("Failed to save theme preference:", err);
-                                }
-                            }}
+                            onClick={() => setTheme("light")}
                             className={cn(
                                 "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
-                                theme === "light"
-                                    ? "bg-indigo-50/50 border-indigo-600 ring-2 ring-indigo-600/10"
-                                    : "bg-background border-border hover:border-indigo-200"
+                                theme === "light" ? "border-indigo-600 bg-indigo-50/50" : "border-transparent bg-muted/30 hover:bg-muted/50"
                             )}
                         >
                             <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
@@ -215,27 +208,18 @@ const SettingsPage: React.FC = () => {
                             </div>
                             <div className="text-center">
                                 <p className="font-semibold text-sm">Light</p>
-                                <p className="text-[10px] text-muted-foreground">Classic brightness</p>
+                                <p className="text-[10px] text-muted-foreground">Standard brightness</p>
                             </div>
                         </button>
 
                         <button
-                            onClick={async () => {
-                                setTheme("dark");
-                                try {
-                                    await apiClient.post("/settings/theme", { theme: "dark" });
-                                } catch (err) {
-                                    console.error("Failed to save theme preference:", err);
-                                }
-                            }}
+                            onClick={() => setTheme("dark")}
                             className={cn(
                                 "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
-                                theme === "dark"
-                                    ? "bg-indigo-950/20 dark:bg-indigo-950/40 border-indigo-600 ring-2 ring-indigo-600/10"
-                                    : "bg-background border-border hover:border-indigo-200"
+                                theme === "dark" ? "border-indigo-600 bg-indigo-50/50" : "border-transparent bg-muted/30 hover:bg-muted/50"
                             )}
                         >
-                            <div className="h-12 w-12 rounded-full bg-indigo-900 flex items-center justify-center text-indigo-300">
+                            <div className="h-12 w-12 rounded-full bg-indigo-900 flex items-center justify-center text-indigo-100">
                                 <Moon className="h-6 w-6" />
                             </div>
                             <div className="text-center">
@@ -245,19 +229,10 @@ const SettingsPage: React.FC = () => {
                         </button>
 
                         <button
-                            onClick={async () => {
-                                setTheme("system");
-                                try {
-                                    await apiClient.post("/settings/theme", { theme: "system" });
-                                } catch (err) {
-                                    console.error("Failed to save theme preference:", err);
-                                }
-                            }}
+                            onClick={() => setTheme("system")}
                             className={cn(
                                 "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
-                                theme === "system"
-                                    ? "bg-muted border-indigo-600 ring-2 ring-indigo-600/10"
-                                    : "bg-background border-border hover:border-indigo-200"
+                                theme === "system" ? "border-indigo-600 bg-indigo-50/50" : "border-transparent bg-muted/30 hover:bg-muted/50"
                             )}
                         >
                             <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground">

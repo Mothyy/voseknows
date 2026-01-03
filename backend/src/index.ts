@@ -20,6 +20,8 @@ const authRoutes = require("./routes/auth");
 const settingsRoutes = require("./routes/settings");
 const dashboardRoutes = require("./routes/dashboard");
 const externalRoutes = require("./routes/external");
+import scraperRoutes from "./routes/scrapers";
+import { startScheduler } from "./services/scraperWorker";
 
 // Configure dotenv to read .env file
 dotenv.config();
@@ -47,6 +49,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/external", externalRoutes);
+app.use("/api/scrapers", scraperRoutes);
 
 // A simple root route to confirm the server is running
 app.get("/", (req: Request, res: Response) => {
@@ -81,4 +84,7 @@ app.listen(port, "0.0.0.0", () => {
     console.log("  - GET /api/budgets");
     console.log("  - GET /api/reports/summary");
     console.log("  - GET /api/dashboard");
+
+    // Start background scraper scheduler
+    startScheduler();
 });
