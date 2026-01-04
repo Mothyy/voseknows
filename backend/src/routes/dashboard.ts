@@ -75,23 +75,26 @@ async function getSummary(startDate: string, endDate: string, userId: string) {
 }
 
 async function getWorthOverTime(startDate: string, endDate: string, userId: string) {
-    // 1. Get total starting balance of all accounts
-    const startingRes = await query(
+    // 1. Get CURRENT total balance of all accounts (snapshot)
+    const currentRes = await query(
         `SELECT SUM(balance) as total FROM accounts WHERE user_id = $1`,
         [userId],
     );
-    const initialBase = parseFloat(startingRes.rows[0].total || "0");
+    const currentBalance = parseFloat(currentRes.rows[0].total || "0");
 
-    // 2. Get net change from transactions BEFORE startDate
-    const preHistoryRes = await query(
-        `SELECT SUM(amount) as total FROM transactions WHERE date < $1 AND user_id = $2`,
+    // 2. Get total change from startDate until NOW (to back-calculate)
+    // We strictly use > or >= based on whether we want start-of-day or end-of-day.
+    // To get Balance at Beginning of StartDate: Subtract ALL transactions >= StartDate
+    const intervalChangeRes = await query(
+        `SELECT SUM(amount) as total FROM transactions WHERE date >= $1 AND user_id = $2`,
         [startDate, userId],
     );
-    const preHistoryChange = parseFloat(preHistoryRes.rows[0].total || "0");
+    const intervalChange = parseFloat(intervalChangeRes.rows[0].total || "0");
 
-    let currentBalance = initialBase + preHistoryChange;
+    // Back-calculate buffer: The balance at the exact moment before StartDate's first transaction
+    let runningBalance = currentBalance - intervalChange;
 
-    // 3. Get daily changes within the range
+    // 3. Get daily changes within the requested range for the graph
     const historySql = `
         WITH date_series AS (
             SELECT generate_series($1::date, $2::date, '1 day'::interval)::date AS day
@@ -112,17 +115,20 @@ async function getWorthOverTime(startDate: string, endDate: string, userId: stri
 
     const { rows } = await query(historySql, [startDate, endDate, userId]);
 
-    // Calculate running total
+    // Calculate running total forward from the starting point
     const history = rows.map((row: any) => {
-        currentBalance += parseFloat(row.change);
+        const dailyChange = parseFloat(row.change);
+        runningBalance += dailyChange;
+
         const dateStr = new Date(row.date).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
         });
+
         return {
             name: dateStr,
-            worth: parseFloat(currentBalance.toFixed(2)),
-            budget: 0, // Budget is not part of wealth history
+            worth: parseFloat(runningBalance.toFixed(2)),
+            budget: 0,
         };
     });
 
