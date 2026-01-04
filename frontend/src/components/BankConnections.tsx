@@ -8,11 +8,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
     Banknote,
     Plus,
-    Trash2,
     RefreshCw,
-    CheckCircle2,
-    AlertCircle,
+    Trash2,
+    Calendar,
+    Play,
     Loader2,
+    AlertCircle,
+    CheckCircle2,
     Edit2
 } from "lucide-react";
 import {
@@ -51,6 +53,7 @@ interface Connection {
     account_id: string | null;
     target_account_name: string | null;
     date_format: string;
+    accounts_map?: Record<string, string>;
 }
 
 export const BankConnections: React.FC = () => {
@@ -67,10 +70,12 @@ export const BankConnections: React.FC = () => {
     const [connectionName, setConnectionName] = useState("");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-    const [selectedAccountId, setSelectedAccountId] = useState("");
+    // const [selectedAccountId, setSelectedAccountId] = useState(""); // Deprecated
     const [frequency, setFrequency] = useState("daily");
     const [dateFormat, setDateFormat] = useState("YYYY-MM-DD");
     const [securityNumber, setSecurityNumber] = useState("");
+    const [accountMapping, setAccountMapping] = useState<Record<string, string>>({});
+    const [foundAccounts, setFoundAccounts] = useState<string[]>([]);
 
     // Dialog state
     const [connectionToDelete, setConnectionToDelete] = useState<Connection | null>(null);
@@ -121,18 +126,13 @@ export const BankConnections: React.FC = () => {
         setConnectionName(conn.name);
         setUsername(""); // Don't show credentials
         setPassword("");
-        setSelectedAccountId(conn.account_id || "");
+        // setSelectedAccountId(conn.account_id || "");
         setDateFormat(conn.date_format || "YYYY-MM-DD");
+        setAccountMapping(conn.accounts_map || {});
+        setFoundAccounts(Object.keys(conn.accounts_map || {}));
         // Also handle metadata
-        try {
-            const metadata = typeof conn.encrypted_metadata === 'string'
-                ? JSON.parse(conn.encrypted_metadata)
-                : conn.encrypted_metadata;
-            if (metadata?.securityNumber) {
-                setSecurityNumber(""); // Keep empty for security on edit, but we know it's there
-            }
-        } catch (e) {
-            console.error("Failed to parse metadata", e);
+        if (conn.encrypted_metadata && selectedScraperSlug === 'bom') {
+            setSecurityNumber(""); // Keep empty for security on edit, but we know it's there
         }
         // Note: frequency would need another GET if we wanted to pre-populate it perfectly, 
         // but for now let's assume default or we could improve the backend GET /connections response to include it.
@@ -146,14 +146,50 @@ export const BankConnections: React.FC = () => {
         setConnectionName("");
         setUsername("");
         setPassword("");
-        setSelectedAccountId("");
+        // setSelectedAccountId("");
         setFrequency("daily");
         setDateFormat("YYYY-MM-DD");
         setSecurityNumber("");
+        setAccountMapping({});
+        setFoundAccounts([]);
         setShowForm(false);
     };
 
     const selectedScraperSlug = scrapers.find(s => s.id === selectedScraper)?.slug;
+
+    const [testResult, setTestResult] = useState<{ success: boolean; accounts?: string[]; error?: string } | null>(null);
+    const [testingConnection, setTestingConnection] = useState(false);
+
+    const handleTestConnection = async () => {
+        setTestingConnection(true);
+        setTestResult(null);
+        setError(null);
+
+        const payload = {
+            scraper_id: selectedScraper,
+            username,
+            password,
+            metadata: selectedScraperSlug === 'bom' ? { securityNumber } : {}
+        };
+
+        try {
+            const res = await apiClient.post("/scrapers/connections/test", payload);
+            if (res.data.success) {
+                setTestResult({ success: true, accounts: res.data.accounts });
+                setFoundAccounts(res.data.accounts || []);
+            } else {
+                setTestResult({ success: false, error: res.data.error || "Unknown error occurred" });
+                setError(res.data.error || "Connection test failed");
+            }
+        } catch (err: any) {
+            console.error("Test Connection Error:", err);
+            const errorMsg = err.response?.data?.error || err.message;
+            setTestResult({ success: false, error: errorMsg });
+            setError("Test failed: " + errorMsg);
+        } finally {
+            setTestingConnection(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -164,11 +200,12 @@ export const BankConnections: React.FC = () => {
             const payload: any = {
                 scraper_id: selectedScraper,
                 name: connectionName,
-                account_id: selectedAccountId || null,
+                account_id: null,
                 date_format: dateFormat,
                 username: username || undefined,
                 password: password || undefined,
-                metadata: selectedScraperSlug === 'bom' ? { securityNumber } : {}
+                metadata: selectedScraperSlug === 'bom' ? { securityNumber } : {},
+                accounts_map: accountMapping
             };
 
             if (editingId) {
@@ -285,21 +322,7 @@ export const BankConnections: React.FC = () => {
                                         required
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="target_account">Allocate to Local Account</Label>
-                                    <select
-                                        id="target_account"
-                                        className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground"
-                                        value={selectedAccountId}
-                                        onChange={(e) => setSelectedAccountId(e.target.value)}
-                                        required
-                                    >
-                                        <option value="">Choose local account...</option>
-                                        {accounts.map(a => (
-                                            <option key={a.id} value={a.id}>{a.name} ({a.type})</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                {/* "Allocate to Local Account" removed as per request - handled by mapping */}
                                 <div className="space-y-2">
                                     <Label htmlFor="frequency">Sync Frequency</Label>
                                     <select
@@ -363,27 +386,100 @@ export const BankConnections: React.FC = () => {
                                         />
                                     </div>
                                 )}
+
+                                {(foundAccounts.length > 0 || Object.keys(accountMapping).length > 0) && (
+                                    <div className="space-y-3 pt-4 border-t mt-4 animate-in fade-in slide-in-from-top-2 duration-300 col-span-full">
+                                        <div>
+                                            <Label className="text-base font-semibold">Account Mapping</Label>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                Link the remote accounts found at your bank to your local accounts.
+                                            </p>
+                                        </div>
+                                        <div className="grid gap-4 bg-muted/30 p-4 rounded-lg border border-border">
+                                            {(foundAccounts.length > 0 ? foundAccounts : Object.keys(accountMapping)).map(remoteName => (
+                                                <div key={remoteName} className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 text-xs font-bold border border-indigo-200">
+                                                            {remoteName.substring(0, 2).toUpperCase()}
+                                                        </div>
+                                                        <span className="text-sm font-medium truncate" title={remoteName}>
+                                                            {remoteName}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex-1 sm:max-w-[250px]">
+                                                        <select
+                                                            className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-ring focus:border-input"
+                                                            value={accountMapping[remoteName] || ""}
+                                                            onChange={e => setAccountMapping({ ...accountMapping, [remoteName]: e.target.value })}
+                                                        >
+                                                            <option value="">-- Select Local Account --</option>
+                                                            {accounts.map(a => (
+                                                                <option key={a.id} value={a.id}>{a.name} ({a.type})</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex justify-between pt-2 gap-3">
-                                <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
-                                <div className="flex gap-3">
-                                    <Button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="px-6 bg-slate-800 hover:bg-slate-900"
-                                        onClick={() => (window as any).syncAfterSave = false}
-                                    >
-                                        {loading && !(window as any).syncAfterSave ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : editingId ? "Save Changes" : "Link Only"}
-                                    </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="px-6 bg-indigo-600 hover:bg-indigo-700"
-                                        onClick={() => (window as any).syncAfterSave = true}
-                                    >
-                                        {loading && (window as any).syncAfterSave ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : editingId ? "Save & Sync" : "Link & Sync Now"}
-                                    </Button>
+                            <div className="flex flex-col gap-4">
+                                <div className="flex flex-col sm:flex-row justify-between pt-2 gap-3">
+                                    <div className="flex gap-2">
+                                        <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            onClick={handleTestConnection}
+                                            disabled={loading || testingConnection || !selectedScraper || !username || !password}
+                                        >
+                                            {testingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                                            Test Connection
+                                        </Button>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <Button
+                                            type="submit"
+                                            disabled={loading || testingConnection}
+                                            className="px-6 bg-slate-800 hover:bg-slate-900"
+                                            onClick={() => (window as any).syncAfterSave = false}
+                                        >
+                                            {loading && !(window as any).syncAfterSave ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : editingId ? "Save Changes" : "Link Only"}
+                                        </Button>
+                                        <Button
+                                            type="submit"
+                                            disabled={loading || testingConnection}
+                                            className="px-6 bg-indigo-600 hover:bg-indigo-700"
+                                            onClick={() => (window as any).syncAfterSave = true}
+                                        >
+                                            {loading && (window as any).syncAfterSave ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : editingId ? "Save & Sync" : "Link & Sync Now"}
+                                        </Button>
+                                    </div>
                                 </div>
+                                {testResult && (
+                                    <div className={`mt-4 p-4 rounded-md border ${testResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                        <div className="flex items-start gap-3">
+                                            {testResult.success ? <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" /> : <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />}
+                                            <div>
+                                                <h4 className={`font-semibold ${testResult.success ? 'text-green-900' : 'text-red-900'}`}>
+                                                    {testResult.success ? "Connection Successful" : "Test Failed"}
+                                                </h4>
+                                                {testResult.error && <p className="text-sm text-red-700 mt-1">{testResult.error}</p>}
+                                                {testResult.accounts && testResult.accounts.length > 0 && (
+                                                    <div className="mt-2 text-sm text-green-800">
+                                                        <p className="font-medium mb-1">Found Accounts:</p>
+                                                        <ul className="list-disc pl-5 space-y-1">
+                                                            {testResult.accounts.map((acct, i) => (
+                                                                <li key={i}>{acct}</li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </form>
                     )}
@@ -422,7 +518,12 @@ export const BankConnections: React.FC = () => {
                                             </div>
                                             <div className="space-y-0.5">
                                                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                                    Target: <strong className="text-indigo-600 dark:text-indigo-400">{conn.target_account_name || "Unallocated"}</strong>
+                                                    Target: <strong className="text-indigo-600 dark:text-indigo-400">
+                                                        {conn.accounts_map && Object.keys(conn.accounts_map).length > 0
+                                                            ? `${Object.keys(conn.accounts_map).length} Account${Object.keys(conn.accounts_map).length === 1 ? '' : 's'} Mapped`
+                                                            : (conn.target_account_name || "Unallocated")
+                                                        }
+                                                    </strong>
                                                 </p>
                                                 <p className="text-[10px] text-muted-foreground">
                                                     {conn.last_run_at ? (
