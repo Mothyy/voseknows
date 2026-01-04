@@ -15,7 +15,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle, Layers } from "lucide-react";
+import { PlusCircle, Layers, Banknote } from "lucide-react";
+import { BalanceAdjustmentDialog } from "@/components/BalanceAdjustmentDialog";
 import { RowSelectionState } from "@tanstack/react-table";
 
 interface TransactionResponse {
@@ -81,6 +82,7 @@ const TransactionsPage: React.FC = () => {
         setSearchParams(newParams);
     };
     const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
+    const [showBalanceDialog, setShowBalanceDialog] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const fetchTransactions = async (
@@ -316,10 +318,16 @@ const TransactionsPage: React.FC = () => {
                             database.
                         </p>
                     </div>
-                    <Button>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add New Transaction
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setShowBalanceDialog(true)}>
+                            <Banknote className="mr-2 h-4 w-4" />
+                            Adjust Balance
+                        </Button>
+                        <Button>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add New Transaction
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 items-center justify-between">
@@ -398,6 +406,13 @@ const TransactionsPage: React.FC = () => {
                 </div>
             </div>
             {renderContent()}
+            <BalanceAdjustmentDialog
+                open={showBalanceDialog}
+                onClose={() => setShowBalanceDialog(false)}
+                accounts={accounts}
+                initialAccountId={selectedAccountId !== "all" ? selectedAccountId : undefined}
+                onSuccess={() => fetchTransactions(true)}
+            />
         </div>
     );
 };

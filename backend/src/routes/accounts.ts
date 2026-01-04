@@ -310,4 +310,76 @@ router.delete("/:id", async (req: any, res: Response) => {
     }
 });
 
+/**
+ * @route   POST /api/accounts/:id/balance-adjustment
+ * @desc    Create a balancing transaction to force the account balance to a target value on a specific date.
+ * @access  Public
+ */
+router.post("/:id/balance-adjustment", async (req: any, res: Response) => {
+    const { id } = req.params;
+    const { date, targetBalance } = req.body;
+
+    if (!date || targetBalance === undefined) {
+        return res
+            .status(400)
+            .json({ error: "Missing required fields: date, targetBalance" });
+    }
+
+    try {
+        // 1. Get Account Starting Balance
+        const accountRes = await query(
+            "SELECT balance FROM accounts WHERE id = $1 AND user_id = $2",
+            [id, (req as any).user.id]
+        );
+
+        if (accountRes.rows.length === 0) {
+            return res.status(404).json({ error: "Account not found" });
+        }
+
+        const startingBalance = parseFloat(accountRes.rows[0].balance);
+
+        // 2. Get Sum of Transactions up to and including Date
+        const sumRes = await query(
+            "SELECT SUM(amount) as total FROM transactions WHERE account_id = $1 AND date <= $2 AND user_id = $3",
+            [id, date, (req as any).user.id]
+        );
+
+        const currentSum = parseFloat(sumRes.rows[0].total || "0");
+        const currentBalance = startingBalance + currentSum;
+
+        // 3. Calculate Difference
+        const diff = parseFloat(targetBalance) - currentBalance;
+
+        // Round difference to 2 decimal places to avoid float precision issues
+        const diffRounded = Math.round(diff * 100) / 100;
+
+        if (Math.abs(diffRounded) < 0.01) {
+            return res.json({ message: "Balance is already correct", adjustment: 0 });
+        }
+
+        // 4. Insert Balancing Transaction
+        const description = "Manual Balance Adjustment";
+        const fitId = `manual-adj-${id}-${Date.now()}`;
+
+        const insertRes = await query(
+            `INSERT INTO transactions
+            (account_id, provider_transaction_id, date, description, amount, status, user_id)
+            VALUES ($1, $2, $3, $4, $5, 'cleared', $6)
+            RETURNING id, amount, date`,
+            [id, fitId, date, description, diffRounded, (req as any).user.id]
+        );
+
+        res.status(201).json({
+            message: "Adjustment transaction created",
+            transaction: insertRes.rows[0],
+            oldBalance: currentBalance,
+            newBalance: currentBalance + diffRounded
+        });
+
+    } catch (err: any) {
+        console.error(`Error creating balance adjustment for account ${id}:`, err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
 module.exports = router;

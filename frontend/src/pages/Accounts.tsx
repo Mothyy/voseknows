@@ -26,6 +26,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { BalanceAdjustmentDialog } from "@/components/BalanceAdjustmentDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +72,7 @@ const AccountsPage: React.FC = () => {
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(
         null,
     );
+    const [balancingAccount, setBalancingAccount] = useState<Account | null>(null);
 
     const handleEdit = (account: Account) => {
         setSelectedAccount(account);
@@ -254,6 +256,15 @@ const AccountsPage: React.FC = () => {
                                         Transactions
                                     </Link>
                                 </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setBalancingAccount(account)}
+                                    title="Reconcile Balance"
+                                    className="px-3"
+                                >
+                                    <Banknote className="h-4 w-4" />
+                                </Button>
                                 <Button asChild variant="ghost" size="sm">
                                     <Link to={`/accounts/${account.id}`}>
                                         Details
@@ -263,8 +274,9 @@ const AccountsPage: React.FC = () => {
                             </div>
                         </CardContent>
                     </Card>
-                ))}
-            </div>
+                ))
+                }
+            </div >
         );
     };
 
@@ -304,6 +316,13 @@ const AccountsPage: React.FC = () => {
                     setIsFormOpen(false);
                     setSelectedAccount(null);
                 }}
+                onSuccess={fetchAccounts}
+            />
+            <BalanceAdjustmentDialog
+                open={!!balancingAccount}
+                onClose={() => setBalancingAccount(null)}
+                accounts={accounts}
+                initialAccountId={balancingAccount?.id}
                 onSuccess={fetchAccounts}
             />
         </>
