@@ -168,9 +168,9 @@ router.post("/connections/test", async (req: any, res: Response) => {
         }
         const scraperSlug = scraperResult.rows[0].slug;
 
-        // Use Node.js scraper for BOM
-        if (scraperSlug.toLowerCase() === 'bom') {
-            console.log("Using Node.js BOM scraper for test...");
+        // Use Node.js scraper for BOM and Greater Bank
+        if (scraperSlug.toLowerCase() === 'bom' || scraperSlug.toLowerCase() === 'greater') {
+            console.log(`Using Node.js ${scraperSlug} scraper for test...`);
             const scraper = ScraperService.getScraper(scraperSlug, {
                 username,
                 password,

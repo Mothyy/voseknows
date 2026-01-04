@@ -147,8 +147,8 @@ export const runScraper = async (connectionId: string) => {
         const scraperRoot = process.env.SCRAPER_PATH || path.join(process.cwd(), "..", "ActualAutomation");
 
         // Branch: Native Node vs Python
-        if (connection.scraper_slug === 'bom') {
-            console.log("Using native Node.js scraper for BOM");
+        if (connection.scraper_slug === 'bom' || connection.scraper_slug === 'greater') {
+            console.log(`Using native Node.js scraper for ${connection.scraper_slug.toUpperCase()}`);
             const { ScraperService } = require('./ScraperService');
 
             const exportPath = path.join(scraperRoot, "exports");
@@ -160,12 +160,12 @@ export const runScraper = async (connectionId: string) => {
                 exportPath
             };
 
-            const scraper = ScraperService.getScraper('bom', config);
+            const scraper = ScraperService.getScraper(connection.scraper_slug, config);
             try {
                 await scraper.login();
                 await scraper.downloadTransactions(); // Downloads to exportPath
                 await scraper.close();
-                console.log("BOM Scraper finished successfully");
+                console.log(`${connection.scraper_slug.toUpperCase()} Scraper finished successfully`);
 
                 await processScraperExports(connection, scraperRoot, connectionId);
                 console.log(`Scraper logic for ${connection.scraper_slug} completed.`);
@@ -250,11 +250,32 @@ export const runScraper = async (connectionId: string) => {
     }
 };
 
+const ensureScrapers = async () => {
+    try {
+        await query(
+            `INSERT INTO scrapers (name, slug, description) 
+             VALUES ($1, $2, $3), ($4, $5, $6)
+             ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description`,
+            [
+                "Bank of Melbourne", "bom", "Scraper for Bank of Melbourne (Node.js)",
+                "Greater Bank", "greater", "Scraper for Greater Bank (Node.js)"
+            ]
+        );
+        console.log("Scrapers seeded successfully.");
+    } catch (err) {
+        console.error("Failed to seed scrapers:", err);
+    }
+};
+
 /**
  * Poor man's scheduler - check for due tasks every minute
  */
 export const startScheduler = () => {
     console.log("Starting scraping scheduler...");
+
+    // Seed scrapers on startup
+    ensureScrapers();
+
     setInterval(async () => {
         try {
             // Find connections with active schedules that are due
