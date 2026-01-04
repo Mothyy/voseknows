@@ -537,7 +537,7 @@ export const BankConnections: React.FC = () => {
                                                     <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/40 rounded-lg border border-red-200 dark:border-red-800 shadow-sm animate-in shake duration-500">
                                                         <div className="flex items-start gap-2">
                                                             <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                                                            <p className="text-sm text-red-700 dark:text-red-300 font-medium">
+                                                            <p className="text-sm text-red-700 dark:text-red-300 font-medium break-words whitespace-pre-wrap max-h-[150px] overflow-y-auto">
                                                                 {conn.last_error}
                                                             </p>
                                                         </div>

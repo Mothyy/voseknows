@@ -135,8 +135,8 @@ export class GreaterBankScraper implements BankScraper {
 
             // Fallback to DOM scraping
             console.log("App state not found, scraping DOM...");
-            const domAccounts = await this.page.$$eval('.ob-list-item__parent-anchor', (elements) => {
-                return elements.map(el => {
+            const domAccounts = await this.page.$$eval('.ob-list-item__parent-anchor', (elements: any[]) => {
+                return elements.map((el: any) => {
                     const name = el.querySelector('.account-name')?.textContent?.trim() || 'Unknown';
                     const number = el.querySelector('.number')?.textContent?.trim() || '';
                     const href = el.getAttribute('href') || '';
@@ -148,7 +148,7 @@ export class GreaterBankScraper implements BankScraper {
             });
 
             this.accountsDetails = domAccounts;
-            return domAccounts.map(a => `${a.name} (${a.number})`);
+            return domAccounts.map((a: any) => `${a.name} (${a.number})`);
 
         } catch (error) {
             console.error("Error fetching accounts:", error);
@@ -185,19 +185,75 @@ export class GreaterBankScraper implements BankScraper {
                 console.log(`Navigating to ${targetUrl}`);
                 await this.page.goto(targetUrl, { waitUntil: 'networkidle' });
 
-                // Click the Export button to open the modal
-                const exportButtonSelector = 'button[aria-label="Export"]';
+                const safeName = account.name.replace(/[^a-z0-9]/gi, '_');
 
-                // Wait for the button to be present and visible
+                // Wait for the main page container to ensure navigation succeeded
                 try {
-                    await this.page.waitForSelector(exportButtonSelector, { state: 'visible', timeout: 10000 });
+                    await this.page.waitForSelector('.transaction-history-page', { state: 'attached', timeout: 20000 });
                 } catch (e) {
-                    console.error(`Export button not found for account ${account.name} at ${targetUrl}`);
-                    continue; // Skip to next account
+                    console.warn(`Transaction page container not found for ${account.name}`);
                 }
 
-                console.log("Opening export modal...");
-                await this.page.click(exportButtonSelector);
+                // Allow dynamic content to load
+                await this.page.waitForTimeout(3000);
+
+                // Attempt to find the Export button
+                // We use $$ to find ALL matches because responsive sites often have multiple buttons (mobile/desktop),
+                // and the first match might be the hidden one. We need to find the VISIBLE one.
+                const exportSelectors = [
+                    'button[data-bs-target="#modal-export"]',
+                    'button[data-target="#modal-export"]',
+                    'button[aria-label="Export"]',
+                    'button:has-text("Export")'
+                ];
+                let clicked = false;
+
+                for (const selector of exportSelectors) {
+                    try {
+                        const buttons = await this.page.$$(selector);
+                        for (const btn of buttons) {
+                            if (await btn.isVisible()) {
+                                console.log(`Found visible export button using selector: ${selector}`);
+                                await btn.click();
+                                clicked = true;
+                                break;
+                            }
+                        }
+                    } catch (e) { }
+                    if (clicked) break;
+                }
+
+                if (!clicked) {
+                    console.error(`Export button not found for ${account.name}`);
+
+                    // Advanced Debugging
+                    try {
+                        const buttons = await this.page.$$eval('button', (btns: any[]) => btns.map((b: any) => ({ t: b.innerText.trim(), v: b.offsetParent !== null })));
+                        console.log("Visible Buttons:", JSON.stringify(buttons.filter((b: any) => b.v)));
+
+                        const bodyText = await this.page.innerText('body');
+                        if (bodyText.includes("No transactions") || bodyText.includes("no history")) {
+                            console.log("No transactions detected in page text.");
+                        } else {
+                            // Check if modal exists in DOM despite button missing
+                            const modalExists = await this.page.$('#modal-export');
+                            console.log(`Modal #modal-export exists in DOM: ${!!modalExists}`);
+                        }
+
+                        // Dump
+                        if (this.config.headless) {
+                            const debugPath = path.join(this.exportDir, `debug_${safeName}_fail.png`);
+                            const htmlPath = path.join(this.exportDir, `debug_${safeName}_fail.html`);
+                            await this.page.screenshot({ path: debugPath, fullPage: true });
+                            fs.writeFileSync(htmlPath, await this.page.content());
+                        }
+                    } catch (debugErr) {
+                        console.error("Debug logging failed:", debugErr);
+                    }
+                    continue;
+                }
+
+                console.log("Export modal opened (or button clicked)...");
 
                 const modalSelector = '#modal-export';
                 await this.page.waitForSelector(modalSelector, { state: 'visible' });
@@ -222,11 +278,15 @@ export class GreaterBankScraper implements BankScraper {
 
                 const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
-                // Fill date fields
-                await this.page.fill('input[name="From"]', formatDate(startDate));
-                await this.page.fill('input[name="To"]', formatDate(endDate));
+                // Wait for UI update
+                await this.page.waitForTimeout(500);
 
-                console.log(`Requesting export from ${formatDate(startDate)} to ${formatDate(endDate)}`);
+                // Select Date Format (DD/MM/YYYY)
+                try {
+                    await this.page.click('label[for="ob-radio-DayLong"]');
+                } catch (e) { console.log("Date format selector not found."); }
+
+                console.log(`Requesting export for ${account.name}...`);
 
                 // Start download handler BEFORE clicking the final submit
                 const downloadPromise = this.page.waitForEvent('download', { timeout: 30000 });
@@ -236,7 +296,6 @@ export class GreaterBankScraper implements BankScraper {
                 await this.page.click(submitButtonSelector);
 
                 const download = await downloadPromise;
-                const safeName = account.name.replace(/[^a-z0-9]/gi, '_');
                 const filename = `Greater_${safeName}_${formatDate(endDate)}.qif`;
                 const filePath = path.join(this.exportDir, filename);
 

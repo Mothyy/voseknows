@@ -4,8 +4,8 @@ import fs = require("fs");
 const { query } = require("../db");
 import { decrypt } from "../lib/encryption";
 
-const processScraperExports = async (connection: any, scraperRoot: string, connectionId: string) => {
-    const exportDir = path.join(scraperRoot, "exports");
+const processScraperExports = async (connection: any, scraperRoot: string, connectionId: string, exportDirOverride?: string) => {
+    const exportDir = exportDirOverride || path.join(scraperRoot, "exports");
     const { ImportService } = require("./importService");
     const importService = new ImportService();
 
@@ -44,7 +44,8 @@ const processScraperExports = async (connection: any, scraperRoot: string, conne
                         for (const [remoteName, localId] of Object.entries(connection.accounts_map as Record<string, string>)) {
                             // Normalize remote key to match filename convention (spaces/slashes to underscores)
                             const normalized = remoteName.replace(/ /g, '_').replace(/\//g, '_');
-                            if (normalized === cleanName) {
+                            // Use startsWith to handle date suffixes in filenames (e.g. Access_Visa_2025-01-01)
+                            if (cleanName.startsWith(normalized)) {
                                 targetAccountId = localId;
                                 console.log(`Mapped ${scraperFile} (${remoteName}) to local account ${localId}`);
                                 break;
@@ -151,13 +152,16 @@ export const runScraper = async (connectionId: string) => {
             console.log(`Using native Node.js scraper for ${connection.scraper_slug.toUpperCase()}`);
             const { ScraperService } = require('./ScraperService');
 
-            const exportPath = path.join(scraperRoot, "exports");
+            // Isolate exports per connection to prevent cross-contamination
+            // Using connectionId ensures uniqueness even for same-bank duplicates
+            const exportPath = path.join(scraperRoot, "exports", connectionId);
+
             const config = {
                 username,
                 password,
                 securityNumber,
                 headless: true,
-                exportPath
+                exportPath // Passed to scraper constructor
             };
 
             const scraper = ScraperService.getScraper(connection.scraper_slug, config);
@@ -167,10 +171,10 @@ export const runScraper = async (connectionId: string) => {
                 await scraper.close();
                 console.log(`${connection.scraper_slug.toUpperCase()} Scraper finished successfully`);
 
-                await processScraperExports(connection, scraperRoot, connectionId);
+                await processScraperExports(connection, scraperRoot, connectionId, exportPath);
                 console.log(`Scraper logic for ${connection.scraper_slug} completed.`);
             } catch (err: any) {
-                console.error("BOM Node Scraper failed:", err);
+                console.error("Node Scraper failed:", err);
                 try { await scraper.close(); } catch (e) { }
                 await handleScraperError(connectionId, `Node Scraper error: ${err.message}`);
             }
@@ -208,20 +212,20 @@ export const runScraper = async (connectionId: string) => {
                 pythonProcess.kill("SIGKILL");
             }, 300000);
 
-            pythonProcess.on("error", async (err) => {
+            pythonProcess.on("error", async (err: any) => {
                 clearTimeout(timeout);
                 await handleScraperError(connectionId, `Scraper system error: ${err.message}`);
             });
 
-            pythonProcess.stdout.on("data", (data) => {
+            pythonProcess.stdout.on("data", (data: any) => {
                 stdout += data.toString();
             });
 
-            pythonProcess.stderr.on("data", (data) => {
+            pythonProcess.stderr.on("data", (data: any) => {
                 stderr += data.toString();
             });
 
-            pythonProcess.on("close", async (code) => {
+            pythonProcess.on("close", async (code: any) => {
                 clearTimeout(timeout);
                 console.log(`Scraper process exited with code ${code}`);
 
@@ -275,6 +279,16 @@ export const startScheduler = () => {
 
     // Seed scrapers on startup
     ensureScrapers();
+
+    // Reset any "running" connections to "idle" on startup (in case of crash/restart)
+    query(
+        "UPDATE automated_connections SET status = 'idle', last_error = 'System restart: execution interrupted' WHERE status = 'running'",
+        []
+    ).then(() => {
+        console.log("Cleaned up stuck scraper statuses.");
+    }).catch((err: any) => {
+        console.error("Failed to clean up scraper statuses:", err);
+    });
 
     setInterval(async () => {
         try {
