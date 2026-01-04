@@ -29,10 +29,12 @@ router.get("/connections", async (req: any, res: Response) => {
         const { rows } = await query(
             `SELECT c.id, c.name, c.status, c.last_run_at, c.last_error, c.account_id, c.date_format, c.encrypted_metadata, c.accounts_map,
     s.name as scraper_name, s.slug as scraper_slug,
-    a.name as target_account_name
+    a.name as target_account_name,
+    sch.frequency, sch.preferred_time
              FROM automated_connections c
              JOIN scrapers s ON c.scraper_id = s.id
              LEFT JOIN accounts a ON c.account_id = a.id
+             LEFT JOIN scraping_schedules sch ON c.id = sch.connection_id
              WHERE c.user_id = $1`,
             [req.user.id]
         );
@@ -118,7 +120,7 @@ router.delete("/connections/:id", async (req: any, res: Response) => {
 });
 
 router.post("/connections/:id/schedule", async (req: any, res: Response) => {
-    const { frequency, is_active } = req.body;
+    const { frequency, is_active, preferred_time } = req.body;
     const connectionId = req.params.id;
 
     if (!frequency) return res.status(400).json({ error: "Frequency is required" });
@@ -130,22 +132,23 @@ router.post("/connections/:id/schedule", async (req: any, res: Response) => {
         if (check.rows.length > 0) {
             const { rows } = await query(
                 `UPDATE scraping_schedules 
-                 SET frequency = $1, is_active = $2, next_run_at = NOW() 
+                 SET frequency = $1, is_active = $2, preferred_time = $4, next_run_at = NOW() 
                  WHERE connection_id = $3
-RETURNING * `,
-                [frequency, is_active !== undefined ? is_active : true, connectionId]
+                 RETURNING * `,
+                [frequency, is_active !== undefined ? is_active : true, connectionId, preferred_time || null]
             );
             res.json(rows[0]);
         } else {
             const { rows } = await query(
-                `INSERT INTO scraping_schedules(connection_id, frequency, is_active, next_run_at)
-VALUES($1, $2, $3, NOW())
-RETURNING * `,
-                [connectionId, frequency, is_active !== undefined ? is_active : true]
+                `INSERT INTO scraping_schedules (connection_id, frequency, is_active, preferred_time, next_run_at)
+                 VALUES ($1, $2, $3, $4, NOW())
+                 RETURNING *`,
+                [connectionId, frequency, true, preferred_time || null]
             );
             res.status(201).json(rows[0]);
         }
     } catch (err) {
+        console.error("Schedule Update Error:", err);
         res.status(500).json({ error: "Failed to update schedule" });
     }
 });

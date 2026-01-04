@@ -42,8 +42,8 @@ const processScraperExports = async (connection: any, scraperRoot: string, conne
                         const cleanName = baseName.replace(prefixRegex, '');
 
                         for (const [remoteName, localId] of Object.entries(connection.accounts_map as Record<string, string>)) {
-                            // Normalize remote key to match filename convention (spaces/slashes to underscores)
-                            const normalized = remoteName.replace(/ /g, '_').replace(/\//g, '_');
+                            // Normalize remote key to strict filename convention
+                            const normalized = remoteName.replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
                             // Use startsWith to handle date suffixes in filenames (e.g. Access_Visa_2025-01-01)
                             if (cleanName.startsWith(normalized)) {
                                 targetAccountId = localId;
@@ -123,6 +123,22 @@ export const runScraper = async (connectionId: string) => {
         // 2. Update status to running
         await query(
             "UPDATE automated_connections SET status = 'running', last_run_at = NOW() WHERE id = $1",
+            [connectionId]
+        );
+
+        // Update schedule to prevent immediate re-run loops and respect preferred time
+        await query(
+            `UPDATE scraping_schedules 
+             SET next_run_at = CASE 
+                WHEN preferred_time IS NOT NULL THEN
+                    CASE 
+                         WHEN frequency = 'weekly' THEN (CURRENT_DATE + INTERVAL '1 week' + preferred_time::time)
+                         ELSE (CURRENT_DATE + INTERVAL '1 day' + preferred_time::time)
+                    END
+                WHEN frequency = 'weekly' THEN NOW() + INTERVAL '1 week'
+                ELSE NOW() + INTERVAL '1 day'
+             END
+             WHERE connection_id = $1`,
             [connectionId]
         );
 

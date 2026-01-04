@@ -54,6 +54,8 @@ interface Connection {
     target_account_name: string | null;
     date_format: string;
     accounts_map?: Record<string, string>;
+    frequency?: string;
+    preferred_time?: string;
 }
 
 export const BankConnections: React.FC = () => {
@@ -72,6 +74,7 @@ export const BankConnections: React.FC = () => {
     const [password, setPassword] = useState("");
     // const [selectedAccountId, setSelectedAccountId] = useState(""); // Deprecated
     const [frequency, setFrequency] = useState("daily");
+    const [preferredTime, setPreferredTime] = useState("");
     const [dateFormat, setDateFormat] = useState("YYYY-MM-DD");
     const [securityNumber, setSecurityNumber] = useState("");
     const [accountMapping, setAccountMapping] = useState<Record<string, string>>({});
@@ -134,8 +137,9 @@ export const BankConnections: React.FC = () => {
         if (conn.encrypted_metadata && selectedScraperSlug === 'bom') {
             setSecurityNumber(""); // Keep empty for security on edit, but we know it's there
         }
-        // Note: frequency would need another GET if we wanted to pre-populate it perfectly, 
-        // but for now let's assume default or we could improve the backend GET /connections response to include it.
+        setFrequency(conn.frequency || "daily");
+        setPreferredTime(conn.preferred_time || "");
+
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -148,6 +152,7 @@ export const BankConnections: React.FC = () => {
         setPassword("");
         // setSelectedAccountId("");
         setFrequency("daily");
+        setPreferredTime("");
         setDateFormat("YYYY-MM-DD");
         setSecurityNumber("");
         setAccountMapping({});
@@ -219,7 +224,8 @@ export const BankConnections: React.FC = () => {
             if (connId) {
                 await apiClient.post(`/scrapers/connections/${connId}/schedule`, {
                     frequency,
-                    is_active: true
+                    is_active: true,
+                    preferred_time: preferredTime
                 });
 
                 if ((window as any).syncAfterSave) {
@@ -337,6 +343,17 @@ export const BankConnections: React.FC = () => {
                                         <option value="monthly">Monthly</option>
                                         <option value="manual">Manual Only</option>
                                     </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="preferred_time">Preferred Time</Label>
+                                    <Input
+                                        id="preferred_time"
+                                        type="time"
+                                        value={preferredTime}
+                                        onChange={(e) => setPreferredTime(e.target.value)}
+                                        className="cursor-pointer"
+                                    />
+                                    <p className="text-[10px] text-muted-foreground mt-1">Approximate run time (Server time)</p>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="username">Customer Number / Username</Label>

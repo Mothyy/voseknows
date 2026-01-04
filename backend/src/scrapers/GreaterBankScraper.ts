@@ -185,7 +185,7 @@ export class GreaterBankScraper implements BankScraper {
                 console.log(`Navigating to ${targetUrl}`);
                 await this.page.goto(targetUrl, { waitUntil: 'networkidle' });
 
-                const safeName = account.name.replace(/[^a-z0-9]/gi, '_');
+                const safeName = `${account.name}_${account.number}`.replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
 
                 // Wait for the main page container to ensure navigation succeeded
                 try {
