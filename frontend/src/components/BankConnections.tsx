@@ -549,6 +549,12 @@ export const BankConnections: React.FC = () => {
                                                         <>Never synced</>
                                                     )}
                                                     {conn.date_format && ` • Format: ${conn.date_format}`}
+                                                    {conn.frequency && (
+                                                        <span className="ml-2 inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-400/10 dark:text-blue-400 dark:ring-blue-400/30">
+                                                            {conn.frequency === 'manual' ? 'Manual' :
+                                                                (conn.frequency.charAt(0).toUpperCase() + conn.frequency.slice(1)) + (conn.preferred_time ? ` @ ${conn.preferred_time}` : '')}
+                                                        </span>
+                                                    )}
                                                 </p>
                                                 {conn.last_error && (
                                                     <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/40 rounded-lg border border-red-200 dark:border-red-800 shadow-sm animate-in shake duration-500">

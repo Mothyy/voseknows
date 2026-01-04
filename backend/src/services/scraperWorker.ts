@@ -164,7 +164,7 @@ export const runScraper = async (connectionId: string) => {
         const scraperRoot = process.env.SCRAPER_PATH || path.join(process.cwd(), "..", "ActualAutomation");
 
         // Branch: Native Node vs Python
-        if (connection.scraper_slug === 'bom' || connection.scraper_slug === 'greater') {
+        if (connection.scraper_slug === 'bom' || connection.scraper_slug === 'greater' || connection.scraper_slug === 'anz') {
             console.log(`Using native Node.js scraper for ${connection.scraper_slug.toUpperCase()}`);
             const { ScraperService } = require('./ScraperService');
 
