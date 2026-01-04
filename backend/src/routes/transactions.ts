@@ -70,6 +70,27 @@ router.get("/", async (req: any, res: Response) => {
             params,
         });
 
+        const validSortColumns: { [key: string]: string } = {
+            date: "t.date",
+            description: "t.description",
+            amount: "t.amount",
+            status: "t.status",
+            account: "a.name",
+            category: "c.name",
+        };
+
+        const sortByParam = req.query.sortBy as string;
+        const sortOrderParam = req.query.sortOrder as string;
+
+        // Default sort
+        let orderByClause = "t.date DESC, t.created_at DESC";
+
+        if (sortByParam && validSortColumns[sortByParam]) {
+            const direction = sortOrderParam?.toLowerCase() === "asc" ? "ASC" : "DESC";
+            const column = validSortColumns[sortByParam];
+            orderByClause = `${column} ${direction}, t.created_at DESC`;
+        }
+
         const countSql = `SELECT COUNT(*) as total FROM transactions t ${whereSQL}`;
         const countResult = await query(countSql, params);
         const total = parseInt(countResult.rows[0].total);
@@ -100,7 +121,7 @@ router.get("/", async (req: any, res: Response) => {
             JOIN accounts a ON t.account_id = a.id
             LEFT JOIN categories c ON t.category_id = c.id
             ${whereSQL}
-            ORDER BY t.date DESC, t.created_at DESC
+            ORDER BY ${orderByClause}
             LIMIT $${params.length + 1} OFFSET $${params.length + 2};
         `;
         const { rows } = await query(sql, [...params, limit, offset]);

@@ -40,6 +40,7 @@ interface DataTableProps<TData, TValue> {
     filterColumnId?: string;
     refreshData?: () => void;
     categories?: any[];
+    accounts?: any[];
     rowSelection?: RowSelectionState;
     onRowSelectionChange?: OnChangeFn<RowSelectionState>;
     onSearch?: (value: string) => void;
@@ -47,6 +48,8 @@ interface DataTableProps<TData, TValue> {
     hasMore?: boolean;
     isLoading?: boolean;
     totalCount?: number;
+    sorting?: SortingState;
+    onSortingChange?: OnChangeFn<SortingState>;
 }
 
 export function DataTable<TData, TValue>({
@@ -55,6 +58,7 @@ export function DataTable<TData, TValue>({
     filterColumnId,
     refreshData,
     categories,
+    accounts,
     rowSelection = {},
     onRowSelectionChange,
     onSearch,
@@ -62,8 +66,15 @@ export function DataTable<TData, TValue>({
     hasMore,
     isLoading,
     totalCount,
+    sorting: controlledSorting,
+    onSortingChange: setControlledSorting,
 }: DataTableProps<TData, TValue>) {
-    const [sorting, setSorting] = React.useState<SortingState>([]);
+    const [internalSorting, setInternalSorting] = React.useState<SortingState>([]);
+
+    const sorting = controlledSorting !== undefined ? controlledSorting : internalSorting;
+    const setSorting = setControlledSorting !== undefined ? setControlledSorting : setInternalSorting;
+    const manualSorting = !!controlledSorting;
+
     const [columnFilters, setColumnFilters] =
         React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] =
@@ -81,6 +92,8 @@ export function DataTable<TData, TValue>({
         enableRowSelection: true,
         onRowSelectionChange,
         onSortingChange: setSorting,
+        manualSorting,
+
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
         getCoreRowModel: getCoreRowModel(),
@@ -89,6 +102,7 @@ export function DataTable<TData, TValue>({
         meta: {
             refreshData,
             categories,
+            accounts,
         },
     });
 

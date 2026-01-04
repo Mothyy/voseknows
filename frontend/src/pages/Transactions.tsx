@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { PlusCircle, Layers, Banknote } from "lucide-react";
 import { BalanceAdjustmentDialog } from "@/components/BalanceAdjustmentDialog";
+import { TransactionFormDialog } from "@/components/TransactionFormDialog";
+import { SortingState } from "@tanstack/react-table";
 import { RowSelectionState } from "@tanstack/react-table";
 
 interface TransactionResponse {
@@ -44,6 +46,7 @@ const TransactionsPage: React.FC = () => {
     const [selectedCategoryId, setSelectedCategoryId] =
         useState<string>(initialCategoryId);
     const [searchQuery, setSearchQuery] = useState<string>("");
+    const [sorting, setSorting] = useState<SortingState>([]);
 
     // Pagination
     const [page, setPage] = useState<number>(1);
@@ -83,6 +86,7 @@ const TransactionsPage: React.FC = () => {
     };
     const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
     const [showBalanceDialog, setShowBalanceDialog] = useState(false);
+    const [showCreateDialog, setShowCreateDialog] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const fetchTransactions = async (
@@ -132,6 +136,11 @@ const TransactionsPage: React.FC = () => {
                 limit: 50,
                 search: currentSearchQuery,
             };
+
+            if (sorting.length > 0) {
+                params.sortBy = sorting[0].id;
+                params.sortOrder = sorting[0].desc ? "desc" : "asc";
+            }
 
             if (currentAccountId && currentAccountId !== "all") {
                 params.accountId = currentAccountId;
@@ -224,7 +233,7 @@ const TransactionsPage: React.FC = () => {
                 abortControllerRef.current.abort();
             }
         };
-    }, [selectedAccountId, selectedCategoryId, searchQuery]);
+    }, [selectedAccountId, selectedCategoryId, searchQuery, sorting]);
 
     const handleLoadMore = () => {
         if (!loading && hasMore) {
@@ -295,12 +304,15 @@ const TransactionsPage: React.FC = () => {
                 filterColumnId="description"
                 refreshData={() => fetchTransactions(true, 1)}
                 categories={categories}
+                accounts={accounts}
                 onSearch={setSearchQuery}
                 onLoadMore={handleLoadMore}
                 hasMore={hasMore}
                 isLoading={loading}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
+                sorting={sorting}
+                onSortingChange={setSorting}
             />
         );
     };
@@ -323,7 +335,7 @@ const TransactionsPage: React.FC = () => {
                             <Banknote className="mr-2 h-4 w-4" />
                             Adjust Balance
                         </Button>
-                        <Button>
+                        <Button onClick={() => setShowCreateDialog(true)}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Add New Transaction
                         </Button>
@@ -410,6 +422,14 @@ const TransactionsPage: React.FC = () => {
                 open={showBalanceDialog}
                 onClose={() => setShowBalanceDialog(false)}
                 accounts={accounts}
+                initialAccountId={selectedAccountId !== "all" ? selectedAccountId : undefined}
+                onSuccess={() => fetchTransactions(true)}
+            />
+            <TransactionFormDialog
+                open={showCreateDialog}
+                onClose={() => setShowCreateDialog(false)}
+                accounts={accounts}
+                categories={categories}
                 initialAccountId={selectedAccountId !== "all" ? selectedAccountId : undefined}
                 onSuccess={() => fetchTransactions(true)}
             />

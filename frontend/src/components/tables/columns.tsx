@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { ColumnDef, Row, Table } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { ColumnDef, Row, Table, Column } from "@tanstack/react-table";
+import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal } from "lucide-react";
 import apiClient from "@/lib/api";
 import type { Transaction } from "@/data/transactions";
 
@@ -25,6 +25,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { TransactionFormDialog } from "@/components/TransactionFormDialog";
 
 // A new, self-contained component to handle the logic for the actions dropdown.
 // It fetches its own category data and calls an update function passed via table meta.
@@ -34,10 +35,12 @@ const TransactionActions: React.FC<{
 }> = ({ row, table }) => {
     const transaction = row.original;
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+    const [showEditDialog, setShowEditDialog] = React.useState(false);
 
     // Use the data passed through the table's meta to avoid redundant API calls
     const meta = table.options.meta as any;
     const categories = meta?.categories || [];
+    const accounts = meta?.accounts || [];
     const refreshData = meta?.refreshData;
 
     const handleSetCategory = async (categoryId: string | null) => {
@@ -58,49 +61,66 @@ const TransactionActions: React.FC<{
     };
 
     return (
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuItem
-                        onClick={() =>
-                            navigator.clipboard.writeText(transaction.id)
-                        }
-                    >
-                        Copy transaction ID
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DialogTrigger asChild>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                            Change Category
+        <>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                            Edit Transaction
                         </DropdownMenuItem>
-                    </DialogTrigger>
-                </DropdownMenuContent>
-            </DropdownMenu>
-            <DialogContent className="sm:max-w-[400px]">
-                <DialogHeader>
-                    <DialogTitle>Assign Category</DialogTitle>
-                </DialogHeader>
-                <div className="py-4">
-                    <CategorySelector
-                        categories={categories}
-                        value={transaction.category_id || "uncategorized"}
-                        onChange={(val) =>
-                            handleSetCategory(
-                                val === "uncategorized" ? null : val,
-                            )
-                        }
-                    />
-                </div>
-            </DialogContent>
-        </Dialog>
+                        <DropdownMenuSeparator />
+                        <DialogTrigger asChild>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                Change Category
+                            </DropdownMenuItem>
+                        </DialogTrigger>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Assign Category</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <CategorySelector
+                            categories={categories}
+                            value={transaction.category_id || "uncategorized"}
+                            onChange={(val) =>
+                                handleSetCategory(
+                                    val === "uncategorized" ? null : val,
+                                )
+                            }
+                        />
+                    </div>
+                </DialogContent>
+            </Dialog>
+            <TransactionFormDialog
+                open={showEditDialog}
+                onClose={() => setShowEditDialog(false)}
+                accounts={accounts}
+                categories={categories}
+                transaction={transaction}
+                onSuccess={() => refreshData && refreshData()}
+            />
+        </>
     );
+};
+
+const cycleSort = (column: Column<Transaction, unknown>) => {
+    const isSorted = column.getIsSorted();
+    if (isSorted === "asc") {
+        column.toggleSorting(true); // desc
+    } else if (isSorted === "desc") {
+        column.clearSorting(); // clear
+    } else {
+        column.toggleSorting(false); // asc
+    }
 };
 
 export const columns: ColumnDef<Transaction>[] = [
@@ -134,12 +154,16 @@ export const columns: ColumnDef<Transaction>[] = [
             return (
                 <Button
                     variant="ghost"
-                    onClick={() =>
-                        column.toggleSorting(column.getIsSorted() === "asc")
-                    }
+                    onClick={() => cycleSort(column)}
                 >
                     Date
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    {column.getIsSorted() === "asc" ? (
+                        <ArrowUp className="ml-2 h-4 w-4" />
+                    ) : column.getIsSorted() === "desc" ? (
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                    ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                    )}
                 </Button>
             );
         },
@@ -149,15 +173,59 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         accessorKey: "description",
-        header: "Description",
+        header: ({ column }) => (
+            <Button
+                variant="ghost"
+                onClick={() => cycleSort(column)}
+            >
+                Description
+                {column.getIsSorted() === "asc" ? (
+                    <ArrowUp className="ml-2 h-4 w-4" />
+                ) : column.getIsSorted() === "desc" ? (
+                    <ArrowDown className="ml-2 h-4 w-4" />
+                ) : (
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                )}
+            </Button>
+        ),
     },
     {
         accessorKey: "account",
-        header: "Account",
+        header: ({ column }) => (
+            <Button
+                variant="ghost"
+                onClick={() => cycleSort(column)}
+            >
+                Account
+                {column.getIsSorted() === "asc" ? (
+                    <ArrowUp className="ml-2 h-4 w-4" />
+                ) : column.getIsSorted() === "desc" ? (
+                    <ArrowDown className="ml-2 h-4 w-4" />
+                ) : (
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                )}
+            </Button>
+        ),
     },
     {
         accessorKey: "amount",
-        header: () => <div className="text-right">Amount</div>,
+        header: ({ column }) => (
+            <div className="text-right">
+                <Button
+                    variant="ghost"
+                    onClick={() => cycleSort(column)}
+                >
+                    Amount
+                    {column.getIsSorted() === "asc" ? (
+                        <ArrowUp className="ml-2 h-4 w-4" />
+                    ) : column.getIsSorted() === "desc" ? (
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                    ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                    )}
+                </Button>
+            </div>
+        ),
         cell: ({ row }) => {
             const val = row.getValue("amount");
             const amount =
@@ -205,14 +273,42 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         accessorKey: "category",
-        header: "Category",
+        header: ({ column }) => (
+            <Button
+                variant="ghost"
+                onClick={() => cycleSort(column)}
+            >
+                Category
+                {column.getIsSorted() === "asc" ? (
+                    <ArrowUp className="ml-2 h-4 w-4" />
+                ) : column.getIsSorted() === "desc" ? (
+                    <ArrowDown className="ml-2 h-4 w-4" />
+                ) : (
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                )}
+            </Button>
+        ),
         cell: ({ row }) => {
             return <div>{row.getValue("category") || "Uncategorized"}</div>;
         },
     },
     {
         accessorKey: "status",
-        header: "Status",
+        header: ({ column }) => (
+            <Button
+                variant="ghost"
+                onClick={() => cycleSort(column)}
+            >
+                Status
+                {column.getIsSorted() === "asc" ? (
+                    <ArrowUp className="ml-2 h-4 w-4" />
+                ) : column.getIsSorted() === "desc" ? (
+                    <ArrowDown className="ml-2 h-4 w-4" />
+                ) : (
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                )}
+            </Button>
+        ),
         cell: ({ row }) => {
             const status = row.getValue("status") as string;
             return (
