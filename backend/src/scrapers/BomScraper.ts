@@ -170,6 +170,29 @@ export class BomScraper implements BankScraper {
                 await link.click();
                 await this.page.waitForLoadState("networkidle");
 
+                // Click "All" filter tab using precise selector from HTML
+                // STRICT MODE: Throw error if not found, as user requires "All" data.
+                const allTabSelector = 'a[href="#transaction-all"]';
+                const allTab = this.page.locator(allTabSelector);
+
+                try {
+                    await allTab.waitFor({ state: 'visible', timeout: 5000 });
+                } catch (e) {
+                    throw new Error(`'All' transaction tab not found (selector: ${allTabSelector}). Aborting export to prevent partial data.`);
+                }
+
+                console.log("Switching to 'All' filter...");
+                await allTab.click();
+                await this.page.waitForLoadState("networkidle");
+
+                // Wait for the corresponding panel to become visible
+                try {
+                    await this.page.waitForSelector('#transaction-all', { state: 'visible', timeout: 10000 });
+                    await this.page.waitForTimeout(1000); // Extra buffer for table rendering
+                } catch (waitErr) {
+                    throw new Error("Clicked 'All' tab but transaction list (#transaction-all) did not appear.");
+                }
+
                 // Export steps
                 await this.page.waitForSelector("#export-file-format", { timeout: 15000 });
                 await this.page.selectOption("#export-file-format", "QIF");
@@ -199,13 +222,8 @@ export class BomScraper implements BankScraper {
 
             } catch (e) {
                 console.error(`Failed to export account at index ${i}`, e);
-                // Try to recover
-                try {
-                    await this.page.goto('https://internetbanking.bankofmelbourne.com.au/banking/accounts');
-                    await this.page.waitForSelector("#acctSummaryList li h2 a");
-                } catch (recErr) {
-                    console.error("Recovery failed", recErr);
-                }
+                // RETHROW error so it is caught by ScraperWorker and reported to Frontend
+                throw e;
             }
         }
 
