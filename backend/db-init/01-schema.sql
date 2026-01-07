@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     description VARCHAR(255) NOT NULL,
     amount NUMERIC(15, 2) NOT NULL,
     status transaction_status NOT NULL DEFAULT 'pending',
+    is_transfer BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

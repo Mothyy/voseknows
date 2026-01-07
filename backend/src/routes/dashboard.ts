@@ -48,6 +48,7 @@ async function getSummary(startDate: string, endDate: string, userId: string) {
             WHERE t.date >= $1 AND t.date <= $2
               AND a.include_in_budget = true
               AND t.category_id IS NOT NULL
+              AND t.is_transfer = false
               AND t.user_id = $3
         ),
         total_budgets AS (
@@ -143,6 +144,7 @@ async function getCategoryVariance(startDate: string, endDate: string, userId: s
             JOIN accounts a ON t.account_id = a.id
             WHERE t.date >= $1 AND t.date <= $2
             AND a.include_in_budget = true
+            AND t.is_transfer = false
             AND t.user_id = $3
             GROUP BY category_id
         ),
@@ -159,7 +161,8 @@ async function getCategoryVariance(startDate: string, endDate: string, userId: s
         FROM categories c
         LEFT JOIN range_budgets b ON c.id = b.category_id
         LEFT JOIN range_actuals a ON c.id = a.category_id
-        WHERE c.user_id = $3 AND (COALESCE(b.budget, 0) > 0 OR COALESCE(a.actual, 0) != 0)
+        WHERE c.user_id = $3 
+          AND (COALESCE(b.budget, 0) > 0 OR COALESCE(a.actual, 0) != 0)
         ORDER BY variance ASC
     `;
 

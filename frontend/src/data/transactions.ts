@@ -9,6 +9,9 @@ export type Transaction = {
     category: string | null;
     account_id: string;
     category_id: string | null;
+    is_transfer: boolean;
+    transfer_id?: string | null;
+    subRows?: Transaction[];
 };
 
 export const transactions: Transaction[] = [];

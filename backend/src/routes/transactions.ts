@@ -112,6 +112,9 @@ router.get("/", async (req: any, res: Response) => {
                 t.description,
                 t.amount,
                 t.status,
+                t.status,
+                t.is_transfer,
+                t.transfer_id,
                 a.name as account,
                 c.name as category,
                 t.category_id,
@@ -147,23 +150,48 @@ router.get("/", async (req: any, res: Response) => {
  * @access  Public
  */
 router.post("/bulk-update", async (req: any, res: Response) => {
-    const { transactionIds, categoryId } = req.body;
+    const { transactionIds, categoryId, is_transfer } = req.body;
 
     if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
         return res.status(400).json({ error: "No transaction IDs provided" });
     }
 
+    if (categoryId === undefined && is_transfer === undefined) {
+        return res.status(400).json({ error: "No fields to update provided" });
+    }
+
     try {
+        const setClauses: string[] = [];
+        const values: any[] = [];
+        let paramIndex = 1;
+
+        if (categoryId !== undefined) {
+            setClauses.push(`category_id = $${paramIndex++}`);
+            values.push(categoryId || null);
+        }
+
+        if (is_transfer !== undefined) {
+            setClauses.push(`is_transfer = $${paramIndex++}`);
+            values.push(is_transfer);
+
+            if (is_transfer === true && transactionIds.length > 1) {
+                const transferId = require("crypto").randomUUID();
+                setClauses.push(`transfer_id = $${paramIndex++}`);
+                values.push(transferId);
+            } else if (is_transfer === false) {
+                setClauses.push(`transfer_id = NULL`);
+            }
+        }
+
+        values.push(transactionIds);
+        values.push(req.user.id);
+
         const sql = `
             UPDATE transactions
-            SET category_id = $1
-            WHERE id = ANY($2::uuid[]) AND user_id = $3
+            SET ${setClauses.join(", ")}
+            WHERE id = ANY($${paramIndex}::uuid[]) AND user_id = $${paramIndex + 1}
         `;
-        const { rowCount } = await query(sql, [
-            categoryId || null,
-            transactionIds,
-            req.user.id
-        ]);
+        const { rowCount } = await query(sql, values);
 
         res.json({ message: `Successfully updated ${rowCount} transactions` });
     } catch (err: any) {
@@ -294,6 +322,7 @@ router.patch("/:id", async (req: any, res: Response) => {
             updatedTxn.status,
             updatedTxn.date,
             updatedTxn.amount,
+            updatedTxn.is_transfer !== undefined ? updatedTxn.is_transfer : currentTxn.is_transfer || false,
             id,
             req.user.id
         ]);

@@ -13,6 +13,8 @@ import {
     useReactTable,
     RowSelectionState,
     OnChangeFn,
+    ExpandedState,
+    getExpandedRowModel,
 } from "@tanstack/react-table";
 
 import {
@@ -32,7 +34,14 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { ChevronDown, Loader2 } from "lucide-react";
+import apiClient from "@/lib/api";
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[];
@@ -79,29 +88,101 @@ export function DataTable<TData, TValue>({
         React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] =
         React.useState<VisibilityState>({});
+    const [expanded, setExpanded] = React.useState<ExpandedState>({});
+
+    // Group data by transfer_id
+    const groupedData = React.useMemo(() => {
+        const groups: Record<string, TData[]> = {};
+        const standalone: TData[] = [];
+        const processedIds = new Set<string>();
+
+        // First pass: identify groups
+        // We assume TData might have transfer_id (as any)
+        (data as any[]).forEach((item) => {
+            if (item.transfer_id) {
+                if (!groups[item.transfer_id]) {
+                    groups[item.transfer_id] = [];
+                }
+                groups[item.transfer_id].push(item);
+            } else {
+                standalone.push(item);
+            }
+        });
+
+        const result: TData[] = [...standalone];
+
+        // Process groups -> create parent rows
+        Object.keys(groups).forEach((transferId) => {
+            const subRows = groups[transferId];
+            if (subRows.length > 0) {
+                // Create a synthetic parent row
+                // We clone the first row to keep types consistent
+                // But override specific fields
+                const fromTxn = subRows.find((t: any) => Number(t.amount) < 0);
+                const toTxn = subRows.find((t: any) => Number(t.amount) > 0);
+                let groupDesc = "Transfer Group";
+                if (
+                    fromTxn &&
+                    toTxn &&
+                    (fromTxn as any).account &&
+                    (toTxn as any).account
+                ) {
+                    groupDesc = `${(fromTxn as any).account} -> ${(toTxn as any).account
+                        }`;
+                }
+
+                const first = subRows[0];
+                const parentRow = {
+                    ...first,
+                    id: `group-${transferId}`,
+                    description: groupDesc,
+                    category: "Transfer",
+                    is_transfer: true,
+                    amount: 0, // Or sum?
+                    subRows: subRows.map(r => ({ ...r, is_transfer: true })), // Ensure children marked as transfer
+                };
+                result.push(parentRow as unknown as TData);
+            }
+        });
+
+        // We rely on table sorting to order them correctly mixed with standalone.
+        // However, to fix "auto going to the bottom" when unsorted, we manually sort by date DESC default.
+        result.sort((a: any, b: any) => {
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            return dateB - dateA;
+        });
+
+        return result;
+    }, [data]);
 
     // Track last clicked row for shift-select (passed to columns via meta)
     const lastSelectedRowId = React.useRef<string | null>(null);
 
     const table = useReactTable({
-        data,
+        data: groupedData,
         columns,
         state: {
             sorting,
             columnFilters,
             columnVisibility,
             rowSelection,
+            expanded,
         },
         enableRowSelection: true,
         onRowSelectionChange,
         onSortingChange: setSorting,
+        onExpandedChange: setExpanded,
         manualSorting,
+        getSubRows: (row) => (row as any).subRows,
+        getExpandedRowModel: getExpandedRowModel(),
 
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
+        getRowId: (row) => (row as any).id,
         meta: {
             refreshData,
             categories,
@@ -110,8 +191,37 @@ export function DataTable<TData, TValue>({
         },
     });
 
+    const handleMarkAsTransfer = async () => {
+        const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+        if (selectedIds.length === 0) return;
+
+        try {
+            await apiClient.post("/transactions/bulk-update", {
+                transactionIds: selectedIds,
+                is_transfer: true,
+            });
+            if (refreshData) {
+                refreshData();
+                // Optionally clear selection?
+                onRowSelectionChange?.({});
+            }
+        } catch (error) {
+            console.error("Failed to mark as transfer:", error);
+            alert("Failed to mark transactions as transfer.");
+        }
+    };
+
     const handleRowClick = (row: any, event: React.MouseEvent) => {
         const currentId = row.id;
+
+        // Toggle expansion if applicable and not clicking selection checkbox/actions?
+        // Actually, just expanding on click is fine. Selection is handled via checkbox column.
+        if (row.getCanExpand()) {
+            row.toggleExpanded();
+            return; // Don't handle selection logic if toggling group? or do both?
+            // User might want to Select the Group.
+            // Let's do both if needed, but standard table behavior usually separates select vs expand.
+        }
 
         // Handle Shift Select
         if (event.shiftKey && table.options.meta?.lastSelectedRowId.current !== null) {
@@ -225,21 +335,51 @@ export function DataTable<TData, TValue>({
                     </TableHeader>
                     <TableBody>
                         {/* If we have data, show it */}
-                        {table.getRowModel().rows.map((row) => (
-                            <TableRow
-                                key={row.id}
-                                data-state={row.getIsSelected() && "selected"}
-                            >
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
-                                        {flexRender(
-                                            cell.column.columnDef.cell,
-                                            cell.getContext(),
-                                        )}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        {/* If we have data, show it */}
+                        {table.getRowModel().rows.map((row) => {
+                            const isTransfer = (row.original as any).is_transfer;
+                            return (
+                                <ContextMenu key={row.id}>
+                                    <ContextMenuTrigger asChild>
+                                        <TableRow
+                                            data-state={
+                                                row.getIsSelected() &&
+                                                "selected"
+                                            }
+                                            className={
+                                                isTransfer
+                                                    ? "opacity-50 italic cursor-pointer"
+                                                    : "cursor-pointer"
+                                            }
+                                            onClick={(e) => handleRowClick(row, e)}
+                                        >
+                                            {row.getVisibleCells().map(
+                                                (cell) => (
+                                                    <TableCell key={cell.id}>
+                                                        {flexRender(
+                                                            cell.column
+                                                                .columnDef.cell,
+                                                            cell.getContext(),
+                                                        )}
+                                                    </TableCell>
+                                                ),
+                                            )}
+                                        </TableRow>
+                                    </ContextMenuTrigger>
+                                    <ContextMenuContent>
+                                        <ContextMenuItem
+                                            onClick={handleMarkAsTransfer}
+                                            disabled={
+                                                Object.keys(rowSelection)
+                                                    .length === 0
+                                            }
+                                        >
+                                            Mark as Transfer
+                                        </ContextMenuItem>
+                                    </ContextMenuContent>
+                                </ContextMenu>
+                            );
+                        })}
 
                         {/* Loading skeletons - shown when data is empty OR when loading more */}
                         {isLoading && (

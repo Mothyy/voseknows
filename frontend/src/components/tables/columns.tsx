@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ColumnDef, Row, Table, Column } from "@tanstack/react-table";
-import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, ArrowLeftRight } from "lucide-react";
 import apiClient from "@/lib/api";
 import type { Transaction } from "@/data/transactions";
 
@@ -224,6 +224,11 @@ export const columns: ColumnDef<Transaction>[] = [
                 )}
             </Button>
         ),
+        cell: ({ row }) => (
+            <div style={{ paddingLeft: `${row.depth * 1.5}rem` }}>
+                {row.getValue("description")}
+            </div>
+        ),
     },
     {
         accessorKey: "account",
@@ -242,6 +247,10 @@ export const columns: ColumnDef<Transaction>[] = [
                 )}
             </Button>
         ),
+        cell: ({ row }) => {
+            if (row.getCanExpand()) return null;
+            return <div>{row.getValue("account")}</div>;
+        },
     },
     {
         accessorKey: "amount",
@@ -284,9 +293,21 @@ export const columns: ColumnDef<Transaction>[] = [
         },
     },
     {
+        accessorKey: "is_transfer",
+        header: "Transfer",
+        cell: ({ row }) => {
+            return row.getValue("is_transfer") ? (
+                <div className="flex justify-center">
+                    <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+            ) : null;
+        },
+    },
+    {
         accessorKey: "balance",
         header: () => <div className="text-right">Balance</div>,
         cell: ({ row }) => {
+            if (row.getCanExpand()) return null;
             const val = row.getValue("balance");
             const balance =
                 typeof val === "string" ? parseFloat(val) : Number(val);
