@@ -28,7 +28,7 @@ const defaultModels: { [key: string]: string } = {
  */
 router.post("/auto-classify", async (req: any, res: Response) => {
     try {
-        let { apiKey, baseUrl, model, provider } = req.body;
+        let { apiKey, baseUrl, model, provider, onlyRules } = req.body;
 
         // If no API Key provided, fetch from Integrations settings
         if (!apiKey) {
@@ -78,10 +78,65 @@ router.post("/auto-classify", async (req: any, res: Response) => {
 
 
         // Limit to 50 items per batch to prevent timeout/rate limits
-        const result = await classificationService.classifyUncategorized(apiKey, baseUrl, model, req.user.id);
+        const result = await classificationService.classifyUncategorized(apiKey, baseUrl, model, req.user.id, onlyRules);
         res.json(result);
     } catch (error: any) {
         console.error("Classification Route Error:", error);
+        res.status(500).json({ error: error.message || "Internal Server Error" });
+    }
+});
+
+/**
+ * @route   POST /api/classification/suggest-rules
+ * @desc    Generates rule suggestions using LLM based on uncategorized transactions
+ * @access  Private
+ */
+router.post("/suggest-rules", async (req: any, res: Response) => {
+    try {
+        let { apiKey, baseUrl, model, provider } = req.body;
+
+        // If no API Key provided, fetch from Integrations settings
+        if (!apiKey) {
+            let rows;
+            if (provider) {
+                const sql = `
+                    SELECT api_key, model, provider 
+                    FROM llm_settings 
+                    WHERE user_id = $1 AND provider = $2 AND is_active = true
+                `;
+                const res = await query(sql, [req.user.id, provider]);
+                rows = res.rows;
+            } else {
+                const sql = `
+                    SELECT api_key, model, provider 
+                    FROM llm_settings 
+                    WHERE user_id = $1 AND is_active = true
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                `;
+                const res = await query(sql, [req.user.id]);
+                rows = res.rows;
+            }
+
+            if (rows.length > 0) {
+                apiKey = rows[0].api_key;
+                if (!model) model = rows[0].model;
+                provider = rows[0].provider;
+            }
+        }
+
+        const currentProvider = provider || 'openai';
+        if (!baseUrl) {
+            baseUrl = providerUrls[currentProvider] || providerUrls['openai'];
+        }
+        if (!model) {
+            model = defaultModels[currentProvider] || 'gpt-4o';
+        }
+
+        const result = await classificationService.suggestRules(apiKey, baseUrl, model, req.user.id);
+        res.json(result);
+    } catch (error: any) {
+        console.error("Suggest Rules Error:", error);
         res.status(500).json({ error: error.message || "Internal Server Error" });
     }
 });
