@@ -138,11 +138,47 @@ export const columns: ColumnDef<Transaction>[] = [
                 aria-label="Select all"
             />
         ),
-        cell: ({ row }) => (
+        cell: ({ row, table }) => (
             <Checkbox
                 checked={row.getIsSelected()}
                 onCheckedChange={(value) => row.toggleSelected(!!value)}
                 aria-label="Select row"
+                onClick={(e) => {
+                    const meta = table.options.meta as any;
+                    if (!meta?.lastSelectedRowId) return;
+
+                    const { lastSelectedRowId } = meta;
+                    const switchRowId = row.id;
+
+                    if (e.shiftKey && lastSelectedRowId.current !== null) {
+                        const { rows } = table.getRowModel();
+                        const lastIndex = rows.findIndex(r => r.id === lastSelectedRowId.current);
+                        const currentIndex = rows.findIndex(r => r.id === switchRowId);
+
+                        if (lastIndex !== -1 && currentIndex !== -1) {
+                            const start = Math.min(lastIndex, currentIndex);
+                            const end = Math.max(lastIndex, currentIndex);
+
+                            const newSelection = { ...table.getState().rowSelection };
+                            for (let i = start; i <= end; i++) {
+                                const rowId = rows[i].id;
+                                newSelection[rowId] = true;
+                            }
+
+                            // 1. Update selection via table handler
+                            // Note: useReactTable handles onRowSelectionChange internally if state is controlled
+                            // We need to call the updater if possible, or forcing state update may be tricky 
+                            // if we don't have direct setRowSelection access exposed via meta.
+                            // BUT, table.setRowSelection IS available on table instance!
+                            table.setRowSelection(newSelection);
+
+                            // 2. Prevent text selection
+                            window.getSelection()?.removeAllRanges();
+                        }
+                    }
+
+                    lastSelectedRowId.current = switchRowId;
+                }}
             />
         ),
         enableSorting: false,

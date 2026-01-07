@@ -80,6 +80,9 @@ export function DataTable<TData, TValue>({
     const [columnVisibility, setColumnVisibility] =
         React.useState<VisibilityState>({});
 
+    // Track last clicked row for shift-select (passed to columns via meta)
+    const lastSelectedRowId = React.useRef<string | null>(null);
+
     const table = useReactTable({
         data,
         columns,
@@ -103,8 +106,42 @@ export function DataTable<TData, TValue>({
             refreshData,
             categories,
             accounts,
+            lastSelectedRowId,
         },
     });
+
+    const handleRowClick = (row: any, event: React.MouseEvent) => {
+        const currentId = row.id;
+
+        // Handle Shift Select
+        if (event.shiftKey && table.options.meta?.lastSelectedRowId.current !== null) {
+            const { rows } = table.getRowModel();
+            const lastIndex = rows.findIndex(r => r.id === table.options.meta?.lastSelectedRowId.current);
+            const currentIndex = rows.findIndex(r => r.id === currentId);
+
+            if (lastIndex !== -1 && currentIndex !== -1) {
+                const start = Math.min(lastIndex, currentIndex);
+                const end = Math.max(lastIndex, currentIndex);
+
+                const newSelection = { ...rowSelection };
+                // Select all in range
+                for (let i = start; i <= end; i++) {
+                    const rowId = rows[i].id;
+                    newSelection[rowId] = true;
+                }
+
+                onRowSelectionChange?.(newSelection);
+
+                // Clear text selection explicitly
+                window.getSelection()?.removeAllRanges();
+            }
+        }
+
+        // Always update anchor
+        if (table.options.meta?.lastSelectedRowId) {
+            table.options.meta.lastSelectedRowId.current = currentId;
+        }
+    };
 
     // Observer for infinite scroll
     const observerTarget = React.useRef<HTMLTableRowElement>(null);
