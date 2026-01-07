@@ -22,6 +22,11 @@
                 "title": "Categories",
                 "path": "/categories",
                 "icon": "Tags"
+            },
+            {
+                "title": "Rules",
+                "path": "/rules",
+                "icon": "Zap"
             }
         ]
     },

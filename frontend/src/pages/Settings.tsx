@@ -20,6 +20,8 @@ import {
     Sun,
     Moon,
     Monitor,
+    Brain,
+    Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useTheme } from "../contexts/ThemeContext";
@@ -33,6 +35,13 @@ interface APIKey {
     last_used_at: string | null;
 }
 
+interface Integration {
+    id: string;
+    provider: string;
+    model: string;
+    is_active: boolean;
+}
+
 const SettingsPage: React.FC = () => {
     const { user, refreshUser } = useAuth();
     const { theme, setTheme } = useTheme();
@@ -42,6 +51,12 @@ const SettingsPage: React.FC = () => {
     const [generatedKey, setGeneratedKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [successMsg, setSuccessMsg] = useState("");
+
+    // AI Integration State
+    const [integrations, setIntegrations] = useState<Integration[]>([]);
+    const [llmProvider, setLlmProvider] = useState("openai");
+    const [llmKey, setLlmKey] = useState("");
+    const [llmModel, setLlmModel] = useState("gpt-4o");
 
     const fetchSettings = async () => {
         try {
@@ -53,8 +68,18 @@ const SettingsPage: React.FC = () => {
         }
     };
 
+    const fetchIntegrations = async () => {
+        try {
+            const res = await apiClient.get("/integrations/llm");
+            setIntegrations(res.data);
+        } catch (err) {
+            console.error("Failed to fetch integrations", err);
+        }
+    };
+
     useEffect(() => {
         fetchSettings();
+        fetchIntegrations();
     }, []);
 
     const updateTimeout = async () => {
@@ -99,6 +124,36 @@ const SettingsPage: React.FC = () => {
         navigator.clipboard.writeText(text);
         setSuccessMsg("Copied to clipboard!");
         setTimeout(() => setSuccessMsg(""), 2000);
+    };
+
+    const saveIntegration = async () => {
+        if (!llmKey && !llmModel) return;
+        setLoading(true);
+        try {
+            await apiClient.post("/integrations/llm", {
+                provider: llmProvider,
+                apiKey: llmKey,
+                model: llmModel
+            });
+            setSuccessMsg("Integration saved successfully");
+            setLlmKey(""); // Clear key for security
+            fetchIntegrations();
+            setTimeout(() => setSuccessMsg(""), 3000);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const deleteIntegration = async (provider: string) => {
+        if (!confirm("Are you sure you want to remove this integration?")) return;
+        try {
+            await apiClient.delete(`/integrations/llm/${provider}`);
+            fetchIntegrations();
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     return (
@@ -243,6 +298,112 @@ const SettingsPage: React.FC = () => {
                                 <p className="text-[10px] text-muted-foreground">Sync with device</p>
                             </div>
                         </button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* AI Integrations */}
+            <Card className="shadow-md border-slate-200">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Brain className="h-5 w-5 text-indigo-600" />
+                        AI Integrations
+                    </CardTitle>
+                    <CardDescription>
+                        Configure AI providers to enable smart transaction classification.
+                        Your API keys are stored securely.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div className="space-y-2">
+                            <Label htmlFor="provider">Provider</Label>
+                            <select
+                                id="provider"
+                                className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                value={llmProvider}
+                                onChange={(e) => setLlmProvider(e.target.value)}
+                            >
+                                <option value="openai">OpenAI (ChatGPT)</option>
+                                <option value="gemini">Google Gemini</option>
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="api_key">API Key</Label>
+                            <Input
+                                id="api_key"
+                                type="password"
+                                placeholder="sk-..."
+                                value={llmKey}
+                                onChange={(e) => setLlmKey(e.target.value)}
+                                className="h-11"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="model">Model ID (Optional)</Label>
+                            <Input
+                                id="model"
+                                placeholder="gpt-4o"
+                                value={llmModel}
+                                onChange={(e) => setLlmModel(e.target.value)}
+                                className="h-11"
+                            />
+                        </div>
+                    </div>
+                    <div className="flex justify-end">
+                        <Button
+                            onClick={saveIntegration}
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                            disabled={!llmKey || loading}
+                        >
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Save Integration
+                        </Button>
+                    </div>
+
+                    {/* List Configured Integrations */}
+                    <div className="rounded-lg border border-border overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-muted border-b border-border text-muted-foreground font-medium">
+                                <tr>
+                                    <th className="text-left py-3 px-4 font-semibold">Provider</th>
+                                    <th className="text-left py-3 px-4 font-semibold">Model</th>
+                                    <th className="text-left py-3 px-4 font-semibold">Status</th>
+                                    <th className="text-right py-3 px-4 font-semibold">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {integrations.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="py-8 text-center text-muted-foreground italic">
+                                            No AI integrations configured.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    integrations.map((integ) => (
+                                        <tr key={integ.id} className="hover:bg-muted/50 transition-colors">
+                                            <td className="py-3 px-4 font-medium capitalize">{integ.provider}</td>
+                                            <td className="py-3 px-4 text-muted-foreground">{integ.model || 'Default'}</td>
+                                            <td className="py-3 px-4">
+                                                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-xs font-medium flex items-center w-fit gap-1">
+                                                    <CheckCircle2 className="h-3 w-3" /> Active
+                                                </span>
+                                            </td>
+                                            <td className="py-3 px-4 text-right">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-muted-foreground hover:text-red-600 hover:bg-red-500/10"
+                                                    onClick={() => deleteIntegration(integ.provider)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </CardContent>
             </Card>

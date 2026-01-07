@@ -9,6 +9,7 @@ import AccountDetailPage from "@/pages/AccountDetailPage";
 import ConnectionsPage from "@/pages/Connections";
 import ReportsPage from "@/pages/Reports";
 import SettingsPage from "@/pages/Settings";
+import RulesPage from "@/pages/Rules";
 
 // A simple placeholder for other pages
 const GenericPage = ({ title }: { title: string }) => (
@@ -62,6 +63,7 @@ function App() {
                                 element={<SettingsPage />}
                             />
                             <Route path="connections" element={<ConnectionsPage />} />
+                            <Route path="rules" element={<RulesPage />} />
                             <Route
                                 path="*"
                                 element={<GenericPage title="404 - Not Found" />}

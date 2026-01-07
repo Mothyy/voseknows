@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle, Layers, Banknote } from "lucide-react";
+import { PlusCircle, Layers, Banknote, Brain } from "lucide-react";
 import { BalanceAdjustmentDialog } from "@/components/BalanceAdjustmentDialog";
 import { TransactionFormDialog } from "@/components/TransactionFormDialog";
 import { SortingState } from "@tanstack/react-table";
@@ -268,6 +268,31 @@ const TransactionsPage: React.FC = () => {
         }
     };
 
+    const handleAutoClassify = async () => {
+        const confirmMsg = "This will use your configured AI provider to classify uncategorized transactions. Continue?";
+        if (!confirm(confirmMsg)) return;
+
+        setLoading(true);
+        try {
+            const res = await apiClient.post("/classification/auto-classify", {});
+            const count = res.data.categorized_count || 0;
+            const details = res.data.results || [];
+
+            let msg = `Successfully categorized ${count} transactions.`;
+            if (count > 0) {
+                msg += `\n\nSample: ${details.slice(0, 3).map((d: any) => `${d.description} -> ${d.category}`).join("\n")}`;
+            }
+            alert(msg);
+            fetchTransactions(true);
+        } catch (err: any) {
+            console.error("Auto-classify failed:", err);
+            const errMsg = err.response?.data?.error || "Classification failed. Ensure you have an AI Integration set up in Settings.";
+            alert(errMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const flatCategories = React.useMemo(() => {
         const flatten = (nodes: Category[], depth = 0): any[] => {
             let flat: any[] = [];
@@ -331,6 +356,10 @@ const TransactionsPage: React.FC = () => {
                         </p>
                     </div>
                     <div className="flex gap-2">
+                        <Button variant="secondary" onClick={handleAutoClassify} className="gap-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-indigo-200">
+                            <Brain className="h-4 w-4" />
+                            Auto Classify
+                        </Button>
                         <Button variant="outline" onClick={() => setShowBalanceDialog(true)}>
                             <Banknote className="mr-2 h-4 w-4" />
                             Adjust Balance

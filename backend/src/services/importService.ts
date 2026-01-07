@@ -232,9 +232,8 @@ class ImportService {
         const occurrenceMap = new Map<string, number>();
 
         for (const txn of transactions) {
-            const description = txn.memo
-                ? `${txn.description} - ${txn.memo}`
-                : txn.description;
+            const descriptionParts = [txn.description, txn.memo].filter(Boolean);
+            const description = descriptionParts.join(" - ") || "Unknown Transaction";
 
             // Fix: Amex puts Date in 'N', and user may have identical txns on same day.
             // Use composite key + occurrence count to distinguish them safeley.

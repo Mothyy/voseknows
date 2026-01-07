@@ -20,6 +20,9 @@ const authRoutes = require("./routes/auth");
 const settingsRoutes = require("./routes/settings");
 const dashboardRoutes = require("./routes/dashboard");
 const externalRoutes = require("./routes/external");
+const classificationRoutes = require("./routes/classification");
+const integrationRoutes = require("./routes/integrations");
+const rulesRoutes = require("./routes/rules");
 import scraperRoutes from "./routes/scrapers";
 import { startScheduler } from "./services/scraperWorker";
 
@@ -50,6 +53,9 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/external", externalRoutes);
 app.use("/api/scrapers", scraperRoutes);
+app.use("/api/classification", classificationRoutes);
+app.use("/api/integrations", integrationRoutes);
+app.use("/api/rules", rulesRoutes);
 
 // A simple root route to confirm the server is running
 app.get("/", (req: Request, res: Response) => {
