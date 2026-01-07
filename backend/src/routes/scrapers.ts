@@ -16,9 +16,25 @@ router.use(auth);
 // @desc    Get all available scrapers
 router.get("/", async (req: any, res: Response) => {
     try {
+        // Temporary Schema Migration: Add requires_security_pin
+        try {
+            await query("ALTER TABLE scrapers ADD COLUMN IF NOT EXISTS requires_security_pin BOOLEAN DEFAULT FALSE", []);
+            await query("UPDATE scrapers SET requires_security_pin = TRUE WHERE slug = 'bom'", []);
+        } catch (e) {
+            console.error("Schema migration error (ignored):", e);
+        }
+
+        // Auto-seed Amex if missing (Temporary Fix)
+        const amexCheck = await query("SELECT 1 FROM scrapers WHERE slug = 'amex'", []);
+        if (amexCheck.rows.length === 0) {
+            console.log("Seeding Amex scraper...");
+            await query("INSERT INTO scrapers (name, slug) VALUES ('American Express', 'amex')", []);
+        }
+
         const { rows } = await query("SELECT * FROM scrapers", []);
         res.json(rows);
     } catch (err) {
+        console.error("Fetch Scrapers Error:", err);
         res.status(500).json({ error: "Failed to fetch scrapers" });
     }
 });
@@ -172,7 +188,7 @@ router.post("/connections/test", async (req: any, res: Response) => {
         const scraperSlug = scraperResult.rows[0].slug;
 
         // Use Node.js scraper for BOM and Greater Bank
-        if (scraperSlug.toLowerCase() === 'bom' || scraperSlug.toLowerCase() === 'greater') {
+        if (scraperSlug.toLowerCase() === 'bom' || scraperSlug.toLowerCase() === 'greater' || scraperSlug.toLowerCase() === 'amex') {
             console.log(`Using Node.js ${scraperSlug} scraper for test...`);
             const scraper = ScraperService.getScraper(scraperSlug, {
                 username,

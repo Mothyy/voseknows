@@ -37,7 +37,8 @@ COPY backend/scraper/requirements.txt ./scraper-requirements.txt
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip3 install -r scraper-requirements.txt
-RUN playwright install chromium
+# Install browsers for Node.js playwright
+RUN npx playwright install chromium
 
 # Copy the rest of the application's source code
 # Since context is root, we copy the backend subfolder specifically

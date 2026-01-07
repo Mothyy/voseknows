@@ -229,14 +229,23 @@ class ImportService {
         // 5. Insert Transactions
         let insertedCount = 0;
         let skippedCount = 0;
+        const occurrenceMap = new Map<string, number>();
 
         for (const txn of transactions) {
             const description = txn.memo
                 ? `${txn.description} - ${txn.memo}`
                 : txn.description;
-            const fitId =
-                txn.fitId ||
-                `qif-${accountId}-${txn.date}-${txn.amount}-${txn.description}`;
+
+            // Fix: Amex puts Date in 'N', and user may have identical txns on same day.
+            // Use composite key + occurrence count to distinguish them safeley.
+            const baseUnique = `qif-${accountId}-${txn.date}-${txn.amount}-${txn.description}`;
+
+            const count = (occurrenceMap.get(baseUnique) || 0) + 1;
+            occurrenceMap.set(baseUnique, count);
+
+            const fitId = txn.fitId
+                ? `${baseUnique}-${count}-${txn.fitId}`
+                : `${baseUnique}-${count}`;
 
             try {
                 const insertRes = await query(
@@ -251,6 +260,9 @@ class ImportService {
                 if (insertRes.rowCount && insertRes.rowCount > 0) {
                     insertedCount++;
                 } else {
+                    if (skippedCount < 10) {
+                        console.warn(`[DEBUG] Skipped Duplicate: Date=${txn.date} | Amt=${txn.amount} | Desc=${txn.description} | FitID=${fitId}`);
+                    }
                     skippedCount++;
                 }
             } catch (err) {

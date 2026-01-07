@@ -35,30 +35,47 @@ const processScraperExports = async (connection: any, scraperRoot: string, conne
                     let targetAccountId = connection.account_id;
 
                     // Attempt to resolve specific account from map
+                    // Attempt to resolve specific account from map
                     if (connection.accounts_map) {
                         const baseName = scraperFile.substring(0, scraperFile.lastIndexOf('.'));
-                        // Remove prefix (slug_) case insensitive
                         const prefixRegex = new RegExp(`^${connection.scraper_slug}_`, 'i');
                         const cleanName = baseName.replace(prefixRegex, '');
 
-                        for (const [remoteName, localId] of Object.entries(connection.accounts_map as Record<string, string>)) {
+                        console.log(`Mapping debug - File: ${cleanName}`);
+                        const mapEntries = Object.entries(connection.accounts_map as Record<string, string>);
+
+                        for (const [remoteName, localId] of mapEntries) {
                             // Normalize remote key to strict filename convention
                             const normalized = remoteName.replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
-                            // Use startsWith to handle date suffixes in filenames (e.g. Access_Visa_2025-01-01)
-                            if (cleanName.startsWith(normalized)) {
+                            console.log(`Checking against: ${remoteName} -> ${normalized}`);
+
+                            if (cleanName.toLowerCase().startsWith(normalized.toLowerCase())) {
                                 targetAccountId = localId;
-                                console.log(`Mapped ${scraperFile} (${remoteName}) to local account ${localId}`);
+                                console.log(`Mapped ${scraperFile} matched ${remoteName}`);
                                 break;
                             }
+                        }
+
+                        // Fallback: If no match found, but there is only ONE mapped account, use it.
+                        // This handles cases where filenames (Amex_Card) don't perfectly match the map key (My Amex)
+                        if (!targetAccountId && mapEntries.length === 1) {
+                            console.log("No exact filename match, but only one account mapped. Using it.");
+                            targetAccountId = mapEntries[0][1];
                         }
                     }
 
                     if (scraperFile.endsWith(".qif")) {
+                        let dateFormat = connection.date_format || 'YYYY-MM-DD';
+                        // Force AU specific format for known scrapers
+                        if (connection.scraper_slug === 'amex') {
+                            dateFormat = 'DD/MM/YYYY';
+                        }
+
                         importResult = await importService.importQif(
                             fileData,
                             connection.user_id,
                             targetAccountId,
-                            connection.date_format || 'YYYY-MM-DD'
+                            dateFormat
                         );
                     } else {
                         importResult = await importService.importOfx(
@@ -164,7 +181,7 @@ export const runScraper = async (connectionId: string) => {
         const scraperRoot = process.env.SCRAPER_PATH || path.join(process.cwd(), "..", "ActualAutomation");
 
         // Branch: Native Node vs Python
-        if (connection.scraper_slug === 'bom' || connection.scraper_slug === 'greater' || connection.scraper_slug === 'anz') {
+        if (connection.scraper_slug === 'bom' || connection.scraper_slug === 'greater' || connection.scraper_slug === 'anz' || connection.scraper_slug === 'amex') {
             console.log(`Using native Node.js scraper for ${connection.scraper_slug.toUpperCase()}`);
             const { ScraperService } = require('./ScraperService');
 

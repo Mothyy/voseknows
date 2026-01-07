@@ -63,45 +63,113 @@ export class BomScraper implements BankScraper {
                 timeout: 120000
             });
 
-            console.log("Filling credentials...");
+            // Debug log for credential presence (lengths only)
+            console.log(`Filling credentials -> UserLen: ${this.config.username?.length ?? 0}, SecNumLen: ${this.config.securityNumber?.length ?? 0}, PassLen: ${this.config.password?.length ?? 0}`);
+
+            if (!this.config.username || !this.config.securityNumber || !this.config.password) {
+                throw new Error("Missing required credentials (calculated length 0 or undefined). Please check connection settings.");
+            }
 
             // Fill Customer Access Number
-            await this.fillField('Customer Access Number', 'input#access-number', this.config.username!);
+            await this.fillField('Customer Access Number', 'input#access-number', this.config.username);
 
             // Fill Security Number
-            await this.fillField('Security Number', 'input#securityNumber', this.config.securityNumber!);
+            await this.fillField('Security Number', 'input#securityNumber', this.config.securityNumber);
 
             // Fill Password
-            await this.fillField('Password', 'input#internet-password', this.config.password!, true);
+            await this.fillField('Password', 'input#internet-password', this.config.password, true);
 
             console.log("Clicking login...");
             const loginButton = await this.page.waitForSelector('input#logonButton', { state: 'visible' });
             if (!loginButton) throw new Error("Login button not found");
 
+            // Navigation wait
             await Promise.all([
-                this.page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }),
+                this.page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
                 loginButton.click()
             ]);
 
-            // Check for errors
-            const errorSelector = '.error-message, .alert, .error';
-            const errorElement = await this.page.$(errorSelector);
-            if (errorElement) {
-                const errorText = await errorElement.innerText();
-                throw new Error(`Login error: ${errorText}`);
+            // Check for immediate errors on the resulting page
+            const errorSelectors = ['.error-message', '.alert', '.error', '.errormsg', '#error-msg'];
+            for (const sel of errorSelectors) {
+                const el = await this.page.$(sel);
+                if (el && await el.isVisible()) {
+                    const text = await el.innerText();
+                    throw new Error(`Bank returned error: ${text}`);
+                }
             }
 
-            // Wait for success indicator
-            await this.page.waitForLoadState('networkidle');
-            // Simplified check: if we are not on login page and don't see errors
-            console.log("Login successful");
-            return true;
+            // Verify success by looking for dashboard or handling interstitials
+            await this.handlePostLogin();
+
+            // Final check
+            if (await this.page.$("#acctSummaryList")) {
+                console.log("Login successful - Dashboard found");
+                return true;
+            } else {
+                console.error("Login verification failed - Dashboard not found");
+                // Log debugging info
+                const title = await this.page.title();
+                const url = this.page.url();
+                let snippet = "";
+                try {
+                    const body = await this.page.innerText('body');
+                    snippet = body.replace(/\s+/g, ' ').substring(0, 300);
+                } catch (e) { }
+
+                throw new Error(`Login failed. Title: ${title}, URL: ${url}, PageText: ${snippet}`);
+            }
 
         } catch (error) {
             console.error("Login failed:", error);
-            return false;
+            throw error; // Rethrow to propagate to caller
         }
     }
+
+    private async handlePostLogin() {
+        if (!this.page) return;
+
+        console.log("Checking for post-login intermediaries...");
+        try {
+            // Give it a moment (Bank/Network latency)
+            await this.page.waitForLoadState('domcontentloaded');
+
+            // Fast path: Dashboard already there
+            if (await this.page.$("#acctSummaryList")) return;
+
+            // Strategy: Look for "Continue", "Remind Me Later", etc.
+            const actions = [
+                { sel: "input[value='Continue']", name: "Continue Input" },
+                { sel: "button:has-text('Continue')", name: "Continue Button" },
+                { sel: "button:has-text('Remind me later')", name: "Remind Button" },
+                { sel: "a:has-text('Remind me later')", name: "Remind Link" },
+                { sel: "#marketing-continue", name: "Marketing Continue" }
+            ];
+
+            for (const action of actions) {
+                try {
+                    const el = await this.page.$(action.sel);
+                    if (el && await el.isVisible()) {
+                        console.log(`Found interstitial (${action.name}), interacting...`);
+                        await el.click();
+                        await this.page.waitForLoadState('networkidle');
+                        // If dashboard appeared, we are done
+                        if (await this.page.$("#acctSummaryList")) {
+                            console.log("Dashboard reached after interstitial.");
+                            return;
+                        }
+                    }
+                } catch (e) { /* Ignore individual check failures */ }
+            }
+
+            // Wait one last time for dashboard
+            await this.page.waitForSelector("#acctSummaryList", { timeout: 10000 });
+
+        } catch (e) {
+            console.log("Post-login check finished without finding dashboard.");
+        }
+    }
+
 
     private async fillField(name: string, selector: string, value: string, isPassword = false) {
         if (!this.page) return;

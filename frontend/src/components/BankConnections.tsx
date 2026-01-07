@@ -33,6 +33,7 @@ interface Scraper {
     name: string;
     slug: string;
     description: string;
+    requires_security_pin?: boolean;
 }
 
 interface Account {
@@ -125,7 +126,16 @@ export const BankConnections: React.FC = () => {
 
     const handleEdit = (conn: Connection) => {
         setEditingId(conn.id);
-        setSelectedScraper(conn.scraper_id);
+
+        // Robust ID lookup
+        let sId = conn.scraper_id;
+        if (!sId) sId = (conn as any).scraperId;
+        if (!sId && conn.scraper_slug) {
+            const s = scrapers.find(x => x.slug === conn.scraper_slug);
+            if (s) sId = s.id;
+        }
+        setSelectedScraper(sId);
+
         setConnectionName(conn.name);
         setUsername(""); // Don't show credentials
         setPassword("");
@@ -133,10 +143,15 @@ export const BankConnections: React.FC = () => {
         setDateFormat(conn.date_format || "YYYY-MM-DD");
         setAccountMapping(conn.accounts_map || {});
         setFoundAccounts(Object.keys(conn.accounts_map || {}));
+
         // Also handle metadata
-        if (conn.encrypted_metadata && selectedScraperSlug === 'bom') {
-            setSecurityNumber(""); // Keep empty for security on edit, but we know it's there
+        const scraper = scrapers.find(s => String(s.id) === String(sId));
+        if (conn.encrypted_metadata && scraper?.requires_security_pin) {
+            setSecurityNumber("");
         }
+        // Force Metadata loading if it exists in API (it might be stripped but if we had it...)
+        // Actually we assume it's blank on load for security, unless we want to indicate "Set"
+
         setFrequency(conn.frequency || "daily");
         setPreferredTime(conn.preferred_time || "");
 
@@ -160,7 +175,8 @@ export const BankConnections: React.FC = () => {
         setShowForm(false);
     };
 
-    const selectedScraperSlug = scrapers.find(s => s.id === selectedScraper)?.slug;
+    const selectedScraperObj = scrapers.find(s => s.id === selectedScraper);
+    const requiresSecurityPin = selectedScraperObj?.requires_security_pin;
 
     const [testResult, setTestResult] = useState<{ success: boolean; accounts?: string[]; error?: string } | null>(null);
     const [testingConnection, setTestingConnection] = useState(false);
@@ -174,7 +190,7 @@ export const BankConnections: React.FC = () => {
             scraper_id: selectedScraper,
             username,
             password,
-            metadata: selectedScraperSlug === 'bom' ? { securityNumber } : {}
+            metadata: requiresSecurityPin ? { securityNumber } : {}
         };
 
         try {
@@ -202,6 +218,11 @@ export const BankConnections: React.FC = () => {
         setError(null);
         try {
             let connId = editingId;
+
+            // Robustly find slug (ensure string comparison)
+            const scraperObj = scrapers.find(s => String(s.id) === String(selectedScraper));
+            const slug = scraperObj?.slug?.toLowerCase();
+
             const payload: any = {
                 scraper_id: selectedScraper,
                 name: connectionName,
@@ -209,7 +230,8 @@ export const BankConnections: React.FC = () => {
                 date_format: dateFormat,
                 username: username || undefined,
                 password: password || undefined,
-                metadata: selectedScraperSlug === 'bom' ? { securityNumber } : {},
+                // Send metadata if scraper requires it and we have a value
+                metadata: (scraperObj?.requires_security_pin && securityNumber) ? { securityNumber } : undefined,
                 accounts_map: accountMapping
             };
 
@@ -390,15 +412,15 @@ export const BankConnections: React.FC = () => {
                                         <option value="MM/DD/YYYY">MM/DD/YYYY (US)</option>
                                     </select>
                                 </div>
-                                {selectedScraperSlug === 'bom' && (
-                                    <div className="space-y-2 animate-in zoom-in duration-200">
+                                {requiresSecurityPin && (
+                                    <div className="space-y-2">
                                         <Label htmlFor="security_number">Security Number (PIN)</Label>
                                         <Input
                                             id="security_number"
                                             type="password"
                                             value={securityNumber}
                                             onChange={(e) => setSecurityNumber(e.target.value)}
-                                            placeholder={editingId ? "Leave blank to keep current" : "Enter your BOM Security Number"}
+                                            placeholder={editingId ? "Leave blank to keep current" : "Enter your Security Number"}
                                             required={!editingId}
                                         />
                                     </div>
