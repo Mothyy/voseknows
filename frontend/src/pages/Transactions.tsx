@@ -35,6 +35,7 @@ const TransactionsPage: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const initialAccountId = searchParams.get("accountId") || "all";
     const initialCategoryId = searchParams.get("categoryId") || "all";
+    const initialMonth = searchParams.get("month") || "";
 
     const [data, setData] = useState<Transaction[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
@@ -45,6 +46,7 @@ const TransactionsPage: React.FC = () => {
         useState<string>(initialAccountId);
     const [selectedCategoryId, setSelectedCategoryId] =
         useState<string>(initialCategoryId);
+    const [selectedMonth, setSelectedMonth] = useState<string>(initialMonth);
     const [searchQuery, setSearchQuery] = useState<string>("");
     const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -61,8 +63,10 @@ const TransactionsPage: React.FC = () => {
     useEffect(() => {
         const accountId = searchParams.get("accountId") || "all";
         const categoryId = searchParams.get("categoryId") || "all";
+        const month = searchParams.get("month") || "";
         setSelectedAccountId(accountId);
         setSelectedCategoryId(categoryId);
+        setSelectedMonth(month);
     }, [searchParams]);
 
     const handleAccountChange = (value: string) => {
@@ -96,6 +100,7 @@ const TransactionsPage: React.FC = () => {
             accountId: string;
             categoryId: string;
             search: string;
+            month: string;
         },
     ) => {
         const currentAccountId = filters
@@ -104,6 +109,7 @@ const TransactionsPage: React.FC = () => {
         const currentCategoryId = filters
             ? filters.categoryId
             : selectedCategoryId;
+        const currentMonth = filters ? filters.month : selectedMonth;
         const currentSearchQuery = filters ? filters.search : searchQuery;
 
         if (reset) {
@@ -128,6 +134,7 @@ const TransactionsPage: React.FC = () => {
                 currentPage,
                 currentAccountId,
                 currentCategoryId,
+                currentMonth,
                 currentSearchQuery,
             });
             setLoading(true);
@@ -147,6 +154,9 @@ const TransactionsPage: React.FC = () => {
             }
             if (currentCategoryId && currentCategoryId !== "all") {
                 params.categoryId = currentCategoryId;
+            }
+            if (currentMonth) {
+                params.month = currentMonth;
             }
 
             const response = await apiClient.get<TransactionResponse>(
@@ -223,6 +233,7 @@ const TransactionsPage: React.FC = () => {
             fetchTransactions(true, 1, {
                 accountId: selectedAccountId,
                 categoryId: selectedCategoryId,
+                month: selectedMonth,
                 search: searchQuery,
             });
         }, 300);
@@ -233,7 +244,7 @@ const TransactionsPage: React.FC = () => {
                 abortControllerRef.current.abort();
             }
         };
-    }, [selectedAccountId, selectedCategoryId, searchQuery, sorting]);
+    }, [selectedAccountId, selectedCategoryId, selectedMonth, searchQuery, sorting]);
 
     const handleLoadMore = () => {
         if (!loading && hasMore) {

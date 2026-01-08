@@ -21,6 +21,7 @@ router.get("/", async (req: any, res: Response) => {
         const search = (req.query.search as string) || "";
         const categoryId = req.query.categoryId as string;
         const accountId = req.query.accountId as string;
+        const month = req.query.month as string; // YYYY-MM
 
         if (search) {
             limit = 10000;
@@ -38,6 +39,19 @@ router.get("/", async (req: any, res: Response) => {
         if (accountId && accountId !== "all") {
             params.push(accountId);
             whereClauses.push(`t.account_id = $${params.length}`);
+        }
+
+        if (month) {
+            const [y, m] = month.split("-").map(Number);
+            // Start of month
+            const startDate = new Date(Date.UTC(y, m - 1, 1)).toISOString().split("T")[0];
+            // End of month
+            const endDate = new Date(Date.UTC(y, m, 0)).toISOString().split("T")[0];
+
+            params.push(startDate);
+            whereClauses.push(`t.date >= $${params.length}::date`);
+            params.push(endDate);
+            whereClauses.push(`t.date <= $${params.length}::date`);
         }
 
         if (categoryId) {

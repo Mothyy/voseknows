@@ -41,6 +41,7 @@ import {
     startOfYear,
     subMonths,
 } from "date-fns";
+import { Link } from "react-router-dom";
 
 interface BudgetRecord {
     id: string;
@@ -805,7 +806,19 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                                                     )}
                                                                 </TableCell>
                                                                 <TableCell className="text-right text-xs text-muted-foreground">
-                                                                    {data.actual !== 0 ? formatCurrency(data.actual) : "-"}
+                                                                    {data.actual !== 0 ? (
+                                                                        <Link
+                                                                            to={`/transactions?categoryId=${item.category_id === "00000000-0000-0000-0000-000000000000"
+                                                                                    ? "uncategorized"
+                                                                                    : item.category_id
+                                                                                }&month=${monthKey.substring(0, 7)}`}
+                                                                            className="text-blue-600 hover:underline"
+                                                                        >
+                                                                            {formatCurrency(data.actual)}
+                                                                        </Link>
+                                                                    ) : (
+                                                                        "-"
+                                                                    )}
                                                                 </TableCell>
                                                             </React.Fragment>
                                                         );
@@ -833,7 +846,15 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                                                 {formatCurrency(item.mtd_budget)}
                                                             </TableCell>
                                                             <TableCell className="text-right text-muted-foreground">
-                                                                {formatCurrency(item.mtd_actual)}
+                                                                <Link
+                                                                    to={`/transactions?categoryId=${item.category_id === "00000000-0000-0000-0000-000000000000"
+                                                                            ? "uncategorized"
+                                                                            : item.category_id
+                                                                        }&month=${format(startDate, "yyyy-MM")}`}
+                                                                    className="text-blue-600 hover:underline"
+                                                                >
+                                                                    {formatCurrency(item.mtd_actual)}
+                                                                </Link>
                                                             </TableCell>
                                                             <TableCell
                                                                 className={cn(
