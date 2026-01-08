@@ -456,14 +456,14 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-2 bg-muted/30 p-1.5 rounded-lg border shadow-sm">
                     <Button
-                        variant={viewMode === "mtd" && !isEditing ? "default" : "ghost"}
-                        onClick={() => setViewMode("mtd")}
+                        variant={viewMode === "compare" && !isEditing ? "default" : "ghost"}
+                        onClick={() => setViewMode("compare")}
                         disabled={isEditing}
                         size="sm"
                         className="h-8"
                     >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        Monthly
+                        <Columns className="mr-2 h-4 w-4" />
+                        Comparison
                     </Button>
                     <Button
                         variant={viewMode === "ytd" && !isEditing ? "default" : "ghost"}
@@ -474,16 +474,6 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                     >
                         <Target className="mr-2 h-4 w-4" />
                         YTD
-                    </Button>
-                    <Button
-                        variant={viewMode === "compare" && !isEditing ? "default" : "ghost"}
-                        onClick={() => setViewMode("compare")}
-                        disabled={isEditing}
-                        size="sm"
-                        className="h-8"
-                    >
-                        <Columns className="mr-2 h-4 w-4" />
-                        Comparison
                     </Button>
 
                     {viewMode === "compare" && !isEditing && (
