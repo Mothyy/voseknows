@@ -36,6 +36,8 @@ const TransactionsPage: React.FC = () => {
     const initialAccountId = searchParams.get("accountId") || "all";
     const initialCategoryId = searchParams.get("categoryId") || "all";
     const initialMonth = searchParams.get("month") || "";
+    const initialStartDate = searchParams.get("startDate") || "";
+    const initialEndDate = searchParams.get("endDate") || "";
 
     const [data, setData] = useState<Transaction[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
@@ -47,6 +49,10 @@ const TransactionsPage: React.FC = () => {
     const [selectedCategoryId, setSelectedCategoryId] =
         useState<string>(initialCategoryId);
     const [selectedMonth, setSelectedMonth] = useState<string>(initialMonth);
+    const [selectedStartDate, setSelectedStartDate] =
+        useState<string>(initialStartDate);
+    const [selectedEndDate, setSelectedEndDate] =
+        useState<string>(initialEndDate);
     const [searchQuery, setSearchQuery] = useState<string>("");
     const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -64,9 +70,13 @@ const TransactionsPage: React.FC = () => {
         const accountId = searchParams.get("accountId") || "all";
         const categoryId = searchParams.get("categoryId") || "all";
         const month = searchParams.get("month") || "";
+        const startDate = searchParams.get("startDate") || "";
+        const endDate = searchParams.get("endDate") || "";
         setSelectedAccountId(accountId);
         setSelectedCategoryId(categoryId);
         setSelectedMonth(month);
+        setSelectedStartDate(startDate);
+        setSelectedEndDate(endDate);
     }, [searchParams]);
 
     const handleAccountChange = (value: string) => {
@@ -101,6 +111,8 @@ const TransactionsPage: React.FC = () => {
             categoryId: string;
             search: string;
             month: string;
+            startDate: string;
+            endDate: string;
         },
     ) => {
         const currentAccountId = filters
@@ -110,6 +122,8 @@ const TransactionsPage: React.FC = () => {
             ? filters.categoryId
             : selectedCategoryId;
         const currentMonth = filters ? filters.month : selectedMonth;
+        const currentStartDate = filters ? filters.startDate : selectedStartDate;
+        const currentEndDate = filters ? filters.endDate : selectedEndDate;
         const currentSearchQuery = filters ? filters.search : searchQuery;
 
         if (reset) {
@@ -157,6 +171,12 @@ const TransactionsPage: React.FC = () => {
             }
             if (currentMonth) {
                 params.month = currentMonth;
+            }
+            if (currentStartDate) {
+                params.startDate = currentStartDate;
+            }
+            if (currentEndDate) {
+                params.endDate = currentEndDate;
             }
 
             const response = await apiClient.get<TransactionResponse>(
@@ -234,6 +254,8 @@ const TransactionsPage: React.FC = () => {
                 accountId: selectedAccountId,
                 categoryId: selectedCategoryId,
                 month: selectedMonth,
+                startDate: selectedStartDate,
+                endDate: selectedEndDate,
                 search: searchQuery,
             });
         }, 300);
@@ -244,7 +266,7 @@ const TransactionsPage: React.FC = () => {
                 abortControllerRef.current.abort();
             }
         };
-    }, [selectedAccountId, selectedCategoryId, selectedMonth, searchQuery, sorting]);
+    }, [selectedAccountId, selectedCategoryId, selectedMonth, selectedStartDate, selectedEndDate, searchQuery, sorting]);
 
     const handleLoadMore = () => {
         if (!loading && hasMore) {

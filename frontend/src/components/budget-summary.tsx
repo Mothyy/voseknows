@@ -823,15 +823,23 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                                             </React.Fragment>
                                                         );
                                                     })}
-                                                    <TableCell className="text-right border-l font-bold bg-muted/20">
+                                                    <TableCell className="text-right border-l font-bold">
                                                         {formatCurrency(item.mtd_budget)}
                                                     </TableCell>
-                                                    <TableCell className="text-right text-muted-foreground bg-muted/20">
-                                                        {formatCurrency(item.mtd_actual)}
+                                                    <TableCell className="text-right text-muted-foreground">
+                                                        <Link
+                                                            to={`/transactions?categoryId=${item.category_id === "00000000-0000-0000-0000-000000000000"
+                                                                ? "uncategorized"
+                                                                : item.category_id
+                                                                }&startDate=${format(startOfMonth(subMonths(startDate, viewPeriod - 1)), "yyyy-MM-dd")}&endDate=${format(endOfMonth(startDate), "yyyy-MM-dd")}`}
+                                                            className="text-blue-600 hover:underline"
+                                                        >
+                                                            {formatCurrency(item.mtd_actual)}
+                                                        </Link>
                                                     </TableCell>
                                                     <TableCell
                                                         className={cn(
-                                                            "text-right font-bold bg-muted/20",
+                                                            "text-right font-bold",
                                                             mtdVar >= 0 ? "text-green-600" : "text-red-600"
                                                         )}
                                                     >
@@ -913,15 +921,20 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                                         </React.Fragment>
                                                     );
                                                 })}
-                                                <TableCell className="text-right border-l bg-indigo-50/50">
+                                                <TableCell className="text-right border-l">
                                                     {formatCurrency(totals.mtd_budget)}
                                                 </TableCell>
-                                                <TableCell className="text-right bg-indigo-50/50">
-                                                    {formatCurrency(totals.mtd_actual)}
+                                                <TableCell className="text-right">
+                                                    <Link
+                                                        to={`/transactions?startDate=${format(startOfMonth(subMonths(startDate, viewPeriod - 1)), "yyyy-MM-dd")}&endDate=${format(endOfMonth(startDate), "yyyy-MM-dd")}`}
+                                                        className="text-blue-600 hover:underline"
+                                                    >
+                                                        {formatCurrency(totals.mtd_actual)}
+                                                    </Link>
                                                 </TableCell>
                                                 <TableCell
                                                     className={cn(
-                                                        "text-right bg-indigo-50/50",
+                                                        "text-right",
                                                         mtdVariance >= 0 ? "text-green-600" : "text-red-600"
                                                     )}
                                                 >

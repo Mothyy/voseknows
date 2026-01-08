@@ -78,8 +78,8 @@ export class AnzScraper implements BankScraper {
             await this.page.waitForSelector(this.SEL_USER, { state: 'visible', timeout: 30000 });
 
             console.log("Filling credentials...");
-            await this.page.fill(this.SEL_USER, this.config.username);
-            await this.page.fill(this.SEL_PASS, this.config.password);
+            await this.page.fill(this.SEL_USER, this.config.username || "");
+            await this.page.fill(this.SEL_PASS, this.config.password || "");
 
             console.log("Clicking login...");
             const btn = await this.page.waitForSelector(this.SEL_LOGIN_BTN);
@@ -127,15 +127,15 @@ export class AnzScraper implements BankScraper {
             await this.page.waitForSelector(this.SEL_ACCOUNT_ITEM, { state: 'visible' });
 
             // Extract details
-            const domAccounts = await this.page.$$eval(this.SEL_ACCOUNT_ITEM, (elements: any[], nameSel: string, numSel: string) => {
+            const domAccounts = await this.page.$$eval(this.SEL_ACCOUNT_ITEM, (elements: any[], args: { nameSel: string, numSel: string }) => {
                 return elements.map((el: any) => {
-                    const nameEl = el.querySelector(nameSel);
-                    const numEl = el.querySelector(numSel);
+                    const nameEl = el.querySelector(args.nameSel);
+                    const numEl = el.querySelector(args.numSel);
                     const name = nameEl ? nameEl.innerText.trim() : "Unknown";
                     const number = numEl ? numEl.innerText.trim() : "000";
                     return { name, number };
                 });
-            }, this.SEL_ACC_NAME, this.SEL_ACC_NUM);
+            }, { nameSel: this.SEL_ACC_NAME, numSel: this.SEL_ACC_NUM });
 
             this.accountsDetails = domAccounts; // Cache for download step
             console.log(`Found ${domAccounts.length} accounts.`);

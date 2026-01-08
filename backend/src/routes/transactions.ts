@@ -41,18 +41,38 @@ router.get("/", async (req: any, res: Response) => {
             whereClauses.push(`t.account_id = $${params.length}`);
         }
 
-        if (month) {
-            const [y, m] = month.split("-").map(Number);
-            // Start of month
-            const startDate = new Date(Date.UTC(y, m - 1, 1)).toISOString().split("T")[0];
-            // End of month
-            const endDate = new Date(Date.UTC(y, m, 0)).toISOString().split("T")[0];
+        const startDateParam = req.query.startDate as string;
+        const endDateParam = req.query.endDate as string;
 
-            params.push(startDate);
+        let effectiveStartDate: string | null = null;
+        let effectiveEndDate: string | null = null;
+
+        if (startDateParam) {
+            effectiveStartDate = startDateParam;
+        } else if (month) {
+            const [y, m] = month.split("-").map(Number);
+            effectiveStartDate = new Date(Date.UTC(y, m - 1, 1)).toISOString().split("T")[0];
+        }
+
+        if (endDateParam) {
+            effectiveEndDate = endDateParam;
+        } else if (month) {
+            const [y, m] = month.split("-").map(Number);
+            effectiveEndDate = new Date(Date.UTC(y, m, 0)).toISOString().split("T")[0];
+        }
+
+        if (effectiveStartDate) {
+            params.push(effectiveStartDate);
             whereClauses.push(`t.date >= $${params.length}::date`);
-            params.push(endDate);
+        }
+        if (effectiveEndDate) {
+            params.push(effectiveEndDate);
             whereClauses.push(`t.date <= $${params.length}::date`);
         }
+
+        // Wait, the above logic is getting messy with mixing index tracking. 
+        // Let's rewrite cleaner.
+
 
         if (categoryId) {
             if (categoryId === "uncategorized") {
