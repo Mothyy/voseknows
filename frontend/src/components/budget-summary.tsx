@@ -74,7 +74,7 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<"mtd" | "ytd" | "compare">("mtd");
+    const [viewMode, setViewMode] = useState<"mtd" | "ytd" | "compare">("compare");
     const [viewPeriod, setViewPeriod] = useState(3); // Default to 3 for comparison
 
     // Inline Editing State
@@ -568,7 +568,7 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
             ) : (
                 <>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {(viewMode === "mtd" || isEditing || viewMode === "compare") && (
+                        {(viewMode === "mtd" || isEditing) && (
                             <Card className="border-l-4 border-l-blue-500">
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
@@ -809,8 +809,8 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                                                     {data.actual !== 0 ? (
                                                                         <Link
                                                                             to={`/transactions?categoryId=${item.category_id === "00000000-0000-0000-0000-000000000000"
-                                                                                    ? "uncategorized"
-                                                                                    : item.category_id
+                                                                                ? "uncategorized"
+                                                                                : item.category_id
                                                                                 }&month=${monthKey.substring(0, 7)}`}
                                                                             className="text-blue-600 hover:underline"
                                                                         >
@@ -848,8 +848,8 @@ export function BudgetSummary({ startDate, onRefresh }: BudgetSummaryProps) {
                                                             <TableCell className="text-right text-muted-foreground">
                                                                 <Link
                                                                     to={`/transactions?categoryId=${item.category_id === "00000000-0000-0000-0000-000000000000"
-                                                                            ? "uncategorized"
-                                                                            : item.category_id
+                                                                        ? "uncategorized"
+                                                                        : item.category_id
                                                                         }&month=${format(startDate, "yyyy-MM")}`}
                                                                     className="text-blue-600 hover:underline"
                                                                 >
