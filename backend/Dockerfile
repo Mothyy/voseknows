@@ -3,9 +3,6 @@ FROM node:20-bookworm
 
 # Install Python and system dependencies for Playwright
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
     libgbm-dev \
     libnss3 \
     libasound2 \
@@ -30,13 +27,9 @@ WORKDIR /app
 COPY backend/package*.json ./
 
 # Install Node dependencies
+# Install Node dependencies
 RUN npm install
 
-# Copy Python requirements and install them
-COPY backend/scraper/requirements.txt ./scraper-requirements.txt
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-RUN pip3 install -r scraper-requirements.txt
 # Install browsers for Node.js playwright
 RUN npx playwright install chromium
 

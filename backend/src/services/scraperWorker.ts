@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { ScraperService } from "./ScraperService";
 import path = require("path");
 import fs = require("fs");
 const { query } = require("../db");
@@ -177,108 +177,36 @@ export const runScraper = async (connectionId: string) => {
         }
 
         // 4. Set up environment
-        // Use the same scraper root (ActualAutomation) for export consistency
-        const scraperRoot = process.env.SCRAPER_PATH || path.join(process.cwd(), "..", "ActualAutomation");
+        // 4. Set up environment
+        const scraperRoot = process.cwd();
 
-        // Branch: Native Node vs Python
-        if (connection.scraper_slug === 'bom' || connection.scraper_slug === 'greater' || connection.scraper_slug === 'anz' || connection.scraper_slug === 'amex') {
-            console.log(`Using native Node.js scraper for ${connection.scraper_slug.toUpperCase()}`);
-            const { ScraperService } = require('./ScraperService');
+        console.log(`Using native Node.js scraper for ${connection.scraper_slug.toUpperCase()}`);
 
-            // Isolate exports per connection to prevent cross-contamination
-            // Using connectionId ensures uniqueness even for same-bank duplicates
-            const exportPath = path.join(scraperRoot, "exports", connectionId);
+        // Isolate exports per connection to prevent cross-contamination
+        // Using connectionId ensures uniqueness even for same-bank duplicates
+        const exportPath = path.join(scraperRoot, "exports", connectionId);
 
-            const config = {
-                username,
-                password,
-                securityNumber,
-                headless: true,
-                exportPath // Passed to scraper constructor
-            };
+        const config = {
+            username,
+            password,
+            securityNumber,
+            headless: true,
+            exportPath // Passed to scraper constructor
+        };
 
-            const scraper = ScraperService.getScraper(connection.scraper_slug, config);
-            try {
-                await scraper.login();
-                await scraper.downloadTransactions(); // Downloads to exportPath
-                await scraper.close();
-                console.log(`${connection.scraper_slug.toUpperCase()} Scraper finished successfully`);
+        const scraper = ScraperService.getScraper(connection.scraper_slug, config);
+        try {
+            await scraper.login();
+            await scraper.downloadTransactions(); // Downloads to exportPath
+            await scraper.close();
+            console.log(`${connection.scraper_slug.toUpperCase()} Scraper finished successfully`);
 
-                await processScraperExports(connection, scraperRoot, connectionId, exportPath);
-                console.log(`Scraper logic for ${connection.scraper_slug} completed.`);
-            } catch (err: any) {
-                console.error("Node Scraper failed:", err);
-                try { await scraper.close(); } catch (e) { }
-                await handleScraperError(connectionId, `Node Scraper error: ${err.message}`);
-            }
-
-        } else {
-            // Python Fallback
-            const env: any = {
-                ...process.env,
-                [`${connection.scraper_slug.toUpperCase()}_USERNAME`]: username,
-                [`${connection.scraper_slug.toUpperCase()}_PASSWORD`]: password,
-                PYTHONPATH: scraperRoot
-            };
-
-            if (securityNumber) {
-                env[`${connection.scraper_slug.toUpperCase()}_SECURITY_NUMBER`] = securityNumber;
-            }
-
-            const pythonScript = path.join(scraperRoot, "run_banks.py");
-            const venvPython = "/opt/venv/bin/python3";
-            const pythonCommand = fs.existsSync(venvPython) ? venvPython : "python3";
-
-            console.log(`Spawning scraper: ${pythonCommand} ${pythonScript} ${connection.scraper_slug}`);
-
-            const pythonProcess = spawn(pythonCommand, [pythonScript, connection.scraper_slug, "--headless"], {
-                env,
-                cwd: scraperRoot
-            });
-
-            let stdout = "";
-            let stderr = "";
-
-            // Add a timeout (5 minutes)
-            const timeout = setTimeout(() => {
-                console.error(`Scraper for ${connection.scraper_slug} timed out after 5 minutes. Killing process...`);
-                pythonProcess.kill("SIGKILL");
-            }, 300000);
-
-            pythonProcess.on("error", async (err: any) => {
-                clearTimeout(timeout);
-                await handleScraperError(connectionId, `Scraper system error: ${err.message}`);
-            });
-
-            pythonProcess.stdout.on("data", (data: any) => {
-                stdout += data.toString();
-            });
-
-            pythonProcess.stderr.on("data", (data: any) => {
-                stderr += data.toString();
-            });
-
-            pythonProcess.on("close", async (code: any) => {
-                clearTimeout(timeout);
-                console.log(`Scraper process exited with code ${code}`);
-
-                if (code === 0) {
-                    await processScraperExports(connection, scraperRoot, connectionId);
-                    console.log(`Scraper for ${connection.scraper_slug} completed successfully.`);
-                } else {
-                    let errorMessage = stderr || "Scraper failed with unknown error";
-
-                    if (code === null) {
-                        errorMessage = "Scraper process timed out and was terminated.";
-                    } else if (errorMessage.toLowerCase().includes("mfa") || errorMessage.toLowerCase().includes("secondary authentication")) {
-                        errorMessage = "Bank requires MFA/Security Code. This scraper does not support interactive MFA yet.";
-                    } else if (errorMessage.toLowerCase().includes("login") || errorMessage.toLowerCase().includes("credential")) {
-                        errorMessage = "Invalid credentials. Please check your username and password.";
-                    }
-
-                    await handleScraperError(connectionId, errorMessage);
-                }
-            });
+            await processScraperExports(connection, scraperRoot, connectionId, exportPath);
+            console.log(`Scraper logic for ${connection.scraper_slug} completed.`);
+        } catch (err: any) {
+            console.error("Node Scraper failed:", err);
+            try { await scraper.close(); } catch (e) { }
+            await handleScraperError(connectionId, `Node Scraper error: ${err.message}`);
         }
 
     } catch (err: any) {

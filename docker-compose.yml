@@ -28,10 +28,8 @@ services:
         environment:
             - DATABASE_URL=postgres://user:password@db:5432/voseknowsdb
             - ENCRYPTION_KEY=${ENCRYPTION_KEY:-voseknows_secret_key_123}
-            - SCRAPER_PATH=/app/ActualAutomation
         volumes:
             - ./backend:/app
-            - ./ActualAutomation:/app/ActualAutomation
             - /app/node_modules
         depends_on:
             db:

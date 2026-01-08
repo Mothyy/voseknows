@@ -2,7 +2,6 @@ import express from "express";
 const router = express.Router();
 import { query } from "../db";
 import { encrypt } from "../lib/encryption";
-import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
 const auth = require("../middleware/auth");
@@ -214,59 +213,7 @@ router.post("/connections/test", async (req: any, res: Response) => {
             }
         }
 
-        // Fallback to Python for other scrapers (e.g. ANZ) for now
-        // Set up environment for Python
-        const scraperRoot = process.env.SCRAPER_PATH || path.join(process.cwd(), "..", "ActualAutomation");
-        const env: any = {
-            ...process.env,
-            [`${scraperSlug.toUpperCase()}_USERNAME`]: username,
-            [`${scraperSlug.toUpperCase()}_PASSWORD`]: password,
-            PYTHONPATH: scraperRoot
-        };
-
-        if (metadata && metadata.securityNumber) {
-            env[`${scraperSlug.toUpperCase()}_SECURITY_NUMBER`] = metadata.securityNumber;
-        }
-
-        const pythonScript = path.join(scraperRoot, "run_banks.py");
-
-        // Spawn Python process in test mode
-        const pythonProcess = spawn("python3", [pythonScript, scraperSlug, "--headless", "--test"], {
-            env,
-            cwd: scraperRoot
-        });
-
-        let outputData = "";
-        let errorData = "";
-
-        pythonProcess.stdout.on("data", (data) => {
-            outputData += data.toString();
-        });
-
-        pythonProcess.stderr.on("data", (data) => {
-            errorData += data.toString();
-        });
-
-        pythonProcess.on("close", (code) => {
-            if (code !== 0) {
-                console.error("Test Scraper Error Output:", errorData);
-                try {
-                    const result = JSON.parse(outputData);
-                    return res.status(400).json(result);
-                } catch {
-                    return res.status(500).json({ error: "Scraper failed to run", details: errorData });
-                }
-            }
-
-            try {
-                const jsonMatch = outputData.match(/\{.*\}/s);
-                const result = JSON.parse(outputData.trim());
-                res.json(result);
-            } catch (e) {
-                console.error("Failed to parse scraper output:", outputData);
-                res.status(500).json({ error: "Invalid response from scraper", details: outputData });
-            }
-        });
+        return res.status(404).json({ error: `Test for scraper ${scraperSlug} not implemented in Node.js yet` });
 
     } catch (err) {
         console.error("Test Connection Error:", err);
