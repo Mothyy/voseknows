@@ -14,7 +14,8 @@ import {
     List,
     ArrowRight,
     Archive,
-    RotateCcw
+    RotateCcw,
+    Upload
 } from "lucide-react";
 import apiClient from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,8 @@ export type Account = {
     starting_balance: number;
     include_in_budget: boolean;
     is_active?: boolean;
+    total_income?: number;
+    total_expenses?: number;
 };
 
 // Helper to format currency
@@ -77,6 +80,7 @@ const AccountsPage: React.FC = () => {
     );
     const [balancingAccount, setBalancingAccount] = useState<Account | null>(null);
     const [showInactive, setShowInactive] = useState(false);
+    const [importAccount, setImportAccount] = useState<Account | null>(null);
 
     const handleEdit = (account: Account) => {
         setSelectedAccount(account);
@@ -360,6 +364,16 @@ const AccountsPage: React.FC = () => {
                 accounts={accounts}
                 initialAccountId={balancingAccount?.id}
                 onSuccess={fetchAccounts}
+            />
+            {/* Controlled dialog for specific account import */}
+            <ImportTransactionsDialog
+                open={!!importAccount}
+                onOpenChange={(open) => !open && setImportAccount(null)}
+                initialAccountId={importAccount?.id}
+                onUploadSuccess={() => {
+                    setImportAccount(null);
+                    fetchAccounts();
+                }}
             />
         </>
     );

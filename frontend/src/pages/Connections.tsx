@@ -135,42 +135,31 @@ const ConnectionsPage: React.FC = () => {
                 </Alert>
             )}
 
-            <Card className="border-border shadow-sm overflow-hidden">
-                <CardHeader className="bg-muted/30 border-b border-border">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <Database className="h-5 w-5 text-indigo-500" />
-                        Direct Data Feeds
-                    </CardTitle>
-                    <CardDescription>
-                        Active connections to data aggregators like SISS.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {loading ? (
-                        <div className="flex items-center justify-center p-12">
-                            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground opacity-20" />
-                        </div>
-                    ) : connections.length === 0 ? (
-                        <div className="text-center py-16 px-4">
-                            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                                <Link2 className="h-8 w-8 text-muted-foreground opacity-40" />
-                            </div>
-                            <h3 className="text-lg font-medium text-foreground">No feed providers linked</h3>
-                            <p className="text-muted-foreground text-sm max-w-xs mx-auto mt-1 mb-6">
-                                Connect to a service like SISS Data Services to get automatic transaction feeds.
-                            </p>
-                            <Button variant="outline" onClick={() => setIsFormOpen(true)}>
-                                Add your first connection
-                            </Button>
-                        </div>
-                    ) : (
+            {/* Automated Bank Scrapers Section (Moved to Top) */}
+            <div className="animate-in slide-in-from-bottom-4 duration-500">
+                <BankConnections />
+            </div>
+
+            {/* Direct Data Feeds (SISS) */}
+            {connections.length > 0 && (
+                <Card className="border-border shadow-sm overflow-hidden mt-8">
+                    <CardHeader className="bg-muted/30 border-b border-border">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <Database className="h-5 w-5 text-indigo-500" />
+                            Direct Data Feeds
+                        </CardTitle>
+                        <CardDescription>
+                            Active connections to data aggregators like SISS.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
                         <div className="divide-y divide-border">
                             {connections.map((conn) => (
                                 <div key={conn.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-muted/10 transition-colors gap-4">
                                     <div className="flex items-start gap-4">
                                         <div className={`mt-1 h-10 w-10 rounded-full flex items-center justify-center shadow-inner ${conn.status === 'error' ? 'bg-red-50 text-red-600' :
-                                                conn.status === 'syncing' ? 'bg-indigo-50 text-indigo-600' :
-                                                    'bg-emerald-50 text-emerald-600'
+                                            conn.status === 'syncing' ? 'bg-indigo-50 text-indigo-600' :
+                                                'bg-emerald-50 text-emerald-600'
                                             }`}>
                                             {conn.status === 'syncing' ? <RefreshCw className="h-5 w-5 animate-spin" /> :
                                                 conn.status === 'error' ? <AlertCircle className="h-5 w-5" /> :
@@ -230,22 +219,9 @@ const ConnectionsPage: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Automated Bank Scrapers Section */}
-            <div className="pt-4 animate-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="h-0.5 flex-1 bg-border rounded-full" />
-                    <h2 className="text-xl font-bold text-muted-foreground px-2 flex items-center gap-2">
-                        <RefreshCw className="h-5 w-5" />
-                        Automation Engine
-                    </h2>
-                    <div className="h-0.5 flex-1 bg-border rounded-full" />
-                </div>
-                <BankConnections />
-            </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <ConnectionForm
                 isOpen={isFormOpen}

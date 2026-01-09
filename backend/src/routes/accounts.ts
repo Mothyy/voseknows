@@ -95,6 +95,9 @@ router.get("/:id", async (req: any, res: Response) => {
                 a.type,
                 a.balance as starting_balance,
                 (a.balance + COALESCE(SUM(t.amount), 0))::numeric(15, 2) as balance,
+                COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0)::numeric(15, 2) as total_income,
+                COALESCE(SUM(CASE WHEN t.amount < 0 THEN t.amount ELSE 0 END), 0)::numeric(15, 2) as total_expenses,
+                COUNT(t.id) as transaction_count,
                 a.include_in_budget,
                 a.is_active
             FROM accounts a

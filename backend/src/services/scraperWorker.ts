@@ -149,8 +149,8 @@ export const runScraper = async (connectionId: string) => {
              SET next_run_at = CASE 
                 WHEN preferred_time IS NOT NULL THEN
                     CASE 
-                         WHEN frequency = 'weekly' THEN (CURRENT_DATE + INTERVAL '1 week' + preferred_time::time)
-                         ELSE (CURRENT_DATE + INTERVAL '1 day' + preferred_time::time)
+                         WHEN frequency = 'weekly' THEN (((NOW() AT TIME ZONE COALESCE(timezone, 'UTC'))::date + INTERVAL '1 week' + preferred_time::time)::timestamp AT TIME ZONE COALESCE(timezone, 'UTC'))
+                         ELSE (((NOW() AT TIME ZONE COALESCE(timezone, 'UTC'))::date + INTERVAL '1 day' + preferred_time::time)::timestamp AT TIME ZONE COALESCE(timezone, 'UTC'))
                     END
                 WHEN frequency = 'weekly' THEN NOW() + INTERVAL '1 week'
                 ELSE NOW() + INTERVAL '1 day'

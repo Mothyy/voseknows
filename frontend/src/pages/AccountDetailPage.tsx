@@ -33,6 +33,7 @@ import {
     Pie,
 } from "recharts";
 import { format, parseISO } from "date-fns";
+import { ImportTransactionsDialog } from "@/components/import-transactions-dialog";
 
 // Helper to format currency
 const formatCurrency = (amount: number) => {
@@ -223,15 +224,35 @@ const AccountDetailPage: React.FC = () => {
                         >
                             {formatCurrency(account.balance)}
                         </div>
+                        <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4 text-sm text-muted-foreground">
+                            <div>
+                                Initial: <span className="font-medium text-foreground">{formatCurrency(account.starting_balance)}</span>
+                            </div>
+                            <div>
+                                Income: <span className="font-medium text-green-600">+{formatCurrency(account.total_income || 0)}</span>
+                            </div>
+                            <div>
+                                Expenses: <span className="font-medium text-red-600">{formatCurrency(account.total_expenses || 0)}</span>
+                            </div>
+                            <div>
+                                Transactions: <span className="font-medium text-foreground">{account.transaction_count || 0}</span>
+                            </div>
+                        </div>
                     </div>
-                    <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleDeleteTransactions}
-                    >
-                        <Trash className="mr-2 h-4 w-4" />
-                        Delete All Transactions
-                    </Button>
+                    <div className="flex gap-2">
+                        <ImportTransactionsDialog
+                            initialAccountId={id}
+                            onUploadSuccess={fetchAccountDetails}
+                        />
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={handleDeleteTransactions}
+                        >
+                            <Trash className="mr-2 h-4 w-4" />
+                            Delete All Transactions
+                        </Button>
+                    </div>
                 </div>
             </div>
 
@@ -365,7 +386,7 @@ const AccountDetailPage: React.FC = () => {
                                                 key={`cell-${index}`}
                                                 fill={
                                                     COLORS[
-                                                        index % COLORS.length
+                                                    index % COLORS.length
                                                     ]
                                                 }
                                             />
@@ -391,7 +412,7 @@ const AccountDetailPage: React.FC = () => {
                                             style={{
                                                 backgroundColor:
                                                     COLORS[
-                                                        index % COLORS.length
+                                                    index % COLORS.length
                                                     ],
                                             }}
                                         />

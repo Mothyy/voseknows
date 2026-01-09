@@ -50,7 +50,8 @@ router.get("/connections", async (req: any, res: Response) => {
              JOIN scrapers s ON c.scraper_id = s.id
              LEFT JOIN accounts a ON c.account_id = a.id
              LEFT JOIN scraping_schedules sch ON c.id = sch.connection_id
-             WHERE c.user_id = $1`,
+             WHERE c.user_id = $1
+             ORDER BY c.name ASC`,
             [req.user.id]
         );
         res.json(rows);
@@ -135,7 +136,7 @@ router.delete("/connections/:id", async (req: any, res: Response) => {
 });
 
 router.post("/connections/:id/schedule", async (req: any, res: Response) => {
-    const { frequency, is_active, preferred_time } = req.body;
+    const { frequency, is_active, preferred_time, timezone } = req.body;
     const connectionId = req.params.id;
 
     if (!frequency) return res.status(400).json({ error: "Frequency is required" });
@@ -147,18 +148,18 @@ router.post("/connections/:id/schedule", async (req: any, res: Response) => {
         if (check.rows.length > 0) {
             const { rows } = await query(
                 `UPDATE scraping_schedules 
-                 SET frequency = $1, is_active = $2, preferred_time = $4, next_run_at = NOW() 
+                 SET frequency = $1, is_active = $2, preferred_time = $4, timezone = $5, next_run_at = NOW() 
                  WHERE connection_id = $3
                  RETURNING * `,
-                [frequency, is_active !== undefined ? is_active : true, connectionId, preferred_time || null]
+                [frequency, is_active !== undefined ? is_active : true, connectionId, preferred_time || null, timezone || 'UTC']
             );
             res.json(rows[0]);
         } else {
             const { rows } = await query(
-                `INSERT INTO scraping_schedules (connection_id, frequency, is_active, preferred_time, next_run_at)
-                 VALUES ($1, $2, $3, $4, NOW())
+                `INSERT INTO scraping_schedules (connection_id, frequency, is_active, preferred_time, timezone, next_run_at)
+                 VALUES ($1, $2, $3, $4, $5, NOW())
                  RETURNING *`,
-                [connectionId, frequency, true, preferred_time || null]
+                [connectionId, frequency, true, preferred_time || null, timezone || 'UTC']
             );
             res.status(201).json(rows[0]);
         }

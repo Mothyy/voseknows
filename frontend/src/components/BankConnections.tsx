@@ -247,7 +247,8 @@ export const BankConnections: React.FC = () => {
                 await apiClient.post(`/scrapers/connections/${connId}/schedule`, {
                     frequency,
                     is_active: true,
-                    preferred_time: preferredTime
+                    preferred_time: preferredTime,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
                 });
 
                 if ((window as any).syncAfterSave) {

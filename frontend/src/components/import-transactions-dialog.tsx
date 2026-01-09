@@ -24,23 +24,42 @@ import apiClient from "@/lib/api";
 
 interface ImportTransactionsDialogProps {
     onUploadSuccess?: () => void;
+    initialAccountId?: string;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }
 
 export function ImportTransactionsDialog({
     onUploadSuccess,
+    initialAccountId,
+    open: controlledOpen,
+    onOpenChange: controlledOnOpenChange,
 }: ImportTransactionsDialogProps) {
-    const [open, setOpen] = useState(false);
+    const [internalOpen, setInternalOpen] = useState(false);
+
+    const isControlled = controlledOpen !== undefined;
+    const open = isControlled ? controlledOpen : internalOpen;
+    const setOpen = isControlled ? controlledOnOpenChange : setInternalOpen;
+
     const [file, setFile] = useState<File | null>(null);
     const [format, setFormat] = useState<string>("ofx");
     const [dateFormat, setDateFormat] = useState<string>("MM/DD/YYYY");
     const [accounts, setAccounts] = useState<Account[]>([]);
-    const [selectedAccountId, setSelectedAccountId] = useState<string>("auto");
+    const [selectedAccountId, setSelectedAccountId] = useState<string>(
+        initialAccountId || "auto",
+    );
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     useEffect(() => {
         if (open) {
+            setFile(null);
+            setError(null);
+            setSuccessMessage(null);
+            setUploading(false);
+            if (initialAccountId) setSelectedAccountId(initialAccountId);
+
             const fetchAccounts = async () => {
                 try {
                     const response =
@@ -52,7 +71,7 @@ export function ImportTransactionsDialog({
             };
             fetchAccounts();
         }
-    }, [open]);
+    }, [open, initialAccountId]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -115,12 +134,14 @@ export function ImportTransactionsDialog({
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button variant="outline">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Import Transactions
-                </Button>
-            </DialogTrigger>
+            {!isControlled && (
+                <DialogTrigger asChild>
+                    <Button variant="outline">
+                        <Upload className="mr-2 h-4 w-4" />
+                        Import Transactions
+                    </Button>
+                </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Import Transactions</DialogTitle>
@@ -209,8 +230,8 @@ export function ImportTransactionsDialog({
                                 format === "ofx"
                                     ? ".ofx,.qfx"
                                     : format === "qif"
-                                      ? ".qif"
-                                      : "*"
+                                        ? ".qif"
+                                        : "*"
                             }
                             className="col-span-3"
                             onChange={handleFileChange}
