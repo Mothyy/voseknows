@@ -22,7 +22,7 @@ export default function TransactionsScreen() {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
 
-    const { categoryId, startDate, endDate, title } = route.params || {};
+    const { categoryId, accountId, startDate, endDate, title } = route.params || {};
 
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -35,6 +35,7 @@ export default function TransactionsScreen() {
                 limit: 100,
             };
             if (categoryId) params.categoryId = categoryId;
+            if (accountId) params.accountId = accountId;
             if (startDate) params.startDate = startDate;
             if (endDate) params.endDate = endDate;
 

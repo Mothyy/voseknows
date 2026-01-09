@@ -221,9 +221,11 @@ const TransactionsPage: React.FC = () => {
         const fetchMetadata = async () => {
             try {
                 const [accRes, catRes] = await Promise.all([
-                    apiClient.get<Account[]>("/accounts"),
+                    apiClient.get<Account[]>("/accounts?showInactive=true"),
                     apiClient.get<Category[]>("/categories"),
                 ]);
+                // ... (skipping some lines, need to use multiple chunks or make sure context is correct)
+
 
                 setAccounts(Array.isArray(accRes.data) ? accRes.data : []);
                 setCategories(Array.isArray(catRes.data) ? catRes.data : []);

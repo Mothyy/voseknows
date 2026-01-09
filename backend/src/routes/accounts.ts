@@ -13,6 +13,8 @@ router.use(auth);
  */
 router.get("/", async (req: any, res: Response) => {
     try {
+        const showInactive = req.query.showInactive === 'true';
+
         const sql = `
             SELECT
                 a.id,
@@ -20,10 +22,11 @@ router.get("/", async (req: any, res: Response) => {
                 a.type,
                 a.balance as starting_balance,
                 (a.balance + COALESCE(SUM(t.amount), 0))::numeric(15, 2) as balance,
-                a.include_in_budget
+                a.include_in_budget,
+                a.is_active
             FROM accounts a
             LEFT JOIN transactions t ON a.id = t.account_id
-            WHERE a.user_id = $1
+            WHERE a.user_id = $1 ${showInactive ? '' : 'AND a.is_active = TRUE'}
             GROUP BY a.id
             ORDER BY a.name ASC;
         `;
@@ -41,7 +44,7 @@ router.get("/", async (req: any, res: Response) => {
  * @access  Public
  */
 router.post("/", async (req: any, res: Response) => {
-    const { name, type, balance, include_in_budget } = req.body;
+    const { name, type, balance, include_in_budget, is_active } = req.body;
 
     if (!name || !type) {
         return res
@@ -52,15 +55,16 @@ router.post("/", async (req: any, res: Response) => {
     try {
         // We treat the initial provided balance as the starting_balance
         const sql = `
-            INSERT INTO accounts (name, type, balance, include_in_budget, user_id)
-                        VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, name, type, balance as starting_balance, balance, include_in_budget;
+            INSERT INTO accounts (name, type, balance, include_in_budget, is_active, user_id)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, name, type, balance as starting_balance, balance, include_in_budget, is_active;
         `;
         const { rows } = await query(sql, [
             name,
             type,
             balance || 0,
             include_in_budget !== false,
+            is_active !== false, // Default to true
             (req as any).user.id
         ]);
         res.status(201).json(rows[0]);
@@ -91,7 +95,8 @@ router.get("/:id", async (req: any, res: Response) => {
                 a.type,
                 a.balance as starting_balance,
                 (a.balance + COALESCE(SUM(t.amount), 0))::numeric(15, 2) as balance,
-                a.include_in_budget
+                a.include_in_budget,
+                a.is_active
             FROM accounts a
             LEFT JOIN transactions t ON a.id = t.account_id
             WHERE a.id = $1 AND a.user_id = $2
@@ -151,13 +156,14 @@ router.get("/:id/transactions", async (req: any, res: Response) => {
  */
 router.patch("/:id", async (req: any, res: Response) => {
     const { id } = req.params;
-    const { name, type, balance, include_in_budget } = req.body;
+    const { name, type, balance, include_in_budget, is_active } = req.body;
 
     if (
         name === undefined &&
         type === undefined &&
         balance === undefined &&
-        include_in_budget === undefined
+        include_in_budget === undefined &&
+        is_active === undefined
     ) {
         return res.status(400).json({ error: "No fields to update provided" });
     }
@@ -183,13 +189,14 @@ router.patch("/:id", async (req: any, res: Response) => {
                 include_in_budget !== undefined
                     ? include_in_budget
                     : currentAccount.include_in_budget,
+            is_active: is_active !== undefined ? is_active : currentAccount.is_active
         };
 
         const sql = `
             UPDATE accounts
-            SET name = $1, type = $2, balance = $3, include_in_budget = $4
-            WHERE id = $5 AND user_id = $6
-            RETURNING id, name, type, balance as starting_balance, balance, include_in_budget;
+            SET name = $1, type = $2, balance = $3, include_in_budget = $4, is_active = $5
+            WHERE id = $6 AND user_id = $7
+            RETURNING id, name, type, balance as starting_balance, balance, include_in_budget, is_active;
         `;
 
         const { rows } = await query(sql, [
@@ -197,6 +204,7 @@ router.patch("/:id", async (req: any, res: Response) => {
             updatedAccount.type,
             updatedAccount.starting_balance,
             updatedAccount.include_in_budget,
+            updatedAccount.is_active,
             id,
             (req as any).user.id
         ]);

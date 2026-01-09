@@ -13,6 +13,8 @@ import {
     Trash,
     List,
     ArrowRight,
+    Archive,
+    RotateCcw
 } from "lucide-react";
 import apiClient from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,7 @@ export type Account = {
     balance: number;
     starting_balance: number;
     include_in_budget: boolean;
+    is_active?: boolean;
 };
 
 // Helper to format currency
@@ -73,10 +76,23 @@ const AccountsPage: React.FC = () => {
         null,
     );
     const [balancingAccount, setBalancingAccount] = useState<Account | null>(null);
+    const [showInactive, setShowInactive] = useState(false);
 
     const handleEdit = (account: Account) => {
         setSelectedAccount(account);
         setIsFormOpen(true);
+    };
+
+    const handleToggleActive = async (account: Account) => {
+        try {
+            await apiClient.patch(`/accounts/${account.id}`, {
+                is_active: !(account.is_active !== false) // Toggle boolean
+            });
+            fetchAccounts();
+        } catch (e) {
+            console.error(e);
+            alert("Failed to update status");
+        }
     };
 
     const handleDeleteTransactions = async (id: string) => {
@@ -110,7 +126,7 @@ const AccountsPage: React.FC = () => {
     const fetchAccounts = async () => {
         try {
             setLoading(true);
-            const response = await apiClient.get<Account[]>("/accounts");
+            const response = await apiClient.get<Account[]>(`/accounts?showInactive=${showInactive}`);
             setAccounts(response.data);
             setError(null);
         } catch (err) {
@@ -123,7 +139,7 @@ const AccountsPage: React.FC = () => {
 
     useEffect(() => {
         fetchAccounts();
-    }, []);
+    }, [showInactive]);
 
     const renderContent = () => {
         if (loading) {
@@ -154,7 +170,7 @@ const AccountsPage: React.FC = () => {
         return (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {accounts.map((account) => (
-                    <Card key={account.id} className="h-full">
+                    <Card key={account.id} className={cn("h-full", account.is_active === false && "opacity-60")}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <div className="flex items-center gap-2">
                                 {getAccountIcon(account.type)}
@@ -166,6 +182,7 @@ const AccountsPage: React.FC = () => {
                                         {account.name}
                                     </CardTitle>
                                 </Link>
+                                {account.is_active === false && <span className="text-xs font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">Inactive</span>}
                             </div>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -194,6 +211,20 @@ const AccountsPage: React.FC = () => {
                                         <Edit className="mr-2 h-4 w-4" /> Edit
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
+                                        onClick={() => handleToggleActive(account)}
+                                    >
+                                        {account.is_active === false ? (
+                                            <>
+                                                <RotateCcw className="mr-2 h-4 w-4" /> Restore Account
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Archive className="mr-2 h-4 w-4" /> Archive Account
+                                            </>
+                                        )}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
                                         onClick={() =>
                                             handleDeleteTransactions(account.id)
                                         }
@@ -202,7 +233,6 @@ const AccountsPage: React.FC = () => {
                                         <Trash className="mr-2 h-4 w-4" />{" "}
                                         Delete Transactions
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                         onClick={() => handleDelete(account.id)}
                                         className="text-red-600"
@@ -293,6 +323,12 @@ const AccountsPage: React.FC = () => {
                         </p>
                     </div>
                     <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowInactive(!showInactive)}
+                        >
+                            {showInactive ? "Hide Active" : "Show Inactive"}
+                        </Button>
                         <ImportTransactionsDialog
                             onUploadSuccess={fetchAccounts}
                         />
