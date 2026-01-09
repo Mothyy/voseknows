@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Platform, SafeAreaView } from 'react-native';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
-import { ArrowLeft, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, TrendingUp, TrendingDown, Pencil, X } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../lib/api';
 import { SPACING, LIGHT_THEME } from '../constants/theme';
 import { useTheme } from '../hooks/useTheme';
+import BudgetEditModal from '../components/BudgetEditModal';
 
 interface MergedBudgetRecord {
     category_id: string;
@@ -27,6 +28,10 @@ export default function BudgetScreen() {
     const [data, setData] = useState<MergedBudgetRecord[]>([]);
     const [startDate, setStartDate] = useState(new Date());
     const viewPeriod = 3;
+
+    // Editing State
+    const [isEditing, setIsEditing] = useState(false);
+    const [editTarget, setEditTarget] = useState<MergedBudgetRecord | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -153,16 +158,38 @@ export default function BudgetScreen() {
         setStartDate(prev => addMonths(prev, dir));
     };
 
-    const handleDrillDown = (item: MergedBudgetRecord) => {
-        const mtdStart = format(startOfMonth(subMonths(startDate, viewPeriod - 1)), "yyyy-MM-dd");
-        const mtdEnd = format(endOfMonth(startDate), "yyyy-MM-dd");
+    const handleRowPress = (item: MergedBudgetRecord) => {
+        if (isEditing) {
+            setEditTarget(item);
+        } else {
+            // Drill down
+            const mtdStart = format(startOfMonth(subMonths(startDate, viewPeriod - 1)), "yyyy-MM-dd");
+            const mtdEnd = format(endOfMonth(startDate), "yyyy-MM-dd");
 
-        navigation.navigate('Transactions', {
-            categoryId: item.category_id,
-            startDate: mtdStart,
-            endDate: mtdEnd,
-            title: item.category_name,
-        });
+            navigation.navigate('Transactions', {
+                categoryId: item.category_id,
+                startDate: mtdStart,
+                endDate: mtdEnd,
+                title: item.category_name,
+            });
+        }
+    };
+
+    const handleSaveBudget = async (amount: number) => {
+        if (!editTarget) return;
+        const month = format(startDate, 'yyyy-MM-01');
+
+        try {
+            await apiClient.post('/budgets', {
+                category_id: editTarget.category_id,
+                month: month,
+                amount: amount
+            });
+            fetchData();
+        } catch (e: any) {
+            console.error(e);
+            alert("Failed to save budget");
+        }
     };
 
     const renderItem = ({ item }: { item: MergedBudgetRecord }) => {
@@ -173,12 +200,15 @@ export default function BudgetScreen() {
         const varColor = isPositiveVar ? theme.destructive : theme.success;
         const badgeBg = isPositiveVar ? theme.badgeDestructiveBg : theme.badgeSuccessBg;
 
+        const isEditable = isEditing;
+
         return (
-            <TouchableOpacity onPress={() => handleDrillDown(item)} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => handleRowPress(item)} activeOpacity={0.7}>
                 <View style={[
                     styles.row,
                     item.depth === 0 && styles.rootRow,
-                    { paddingLeft: (item.depth || 0) * 12 + 16 }
+                    { paddingLeft: (item.depth || 0) * 12 + 16 },
+                    isEditable && styles.editRow
                 ]}>
                     <View style={styles.nameCol}>
                         <Text style={[
@@ -186,6 +216,7 @@ export default function BudgetScreen() {
                             item.isParent ? styles.parentText : styles.childText
                         ]} numberOfLines={1}>
                             {item.category_name}
+                            {isEditable && <Text style={{ fontSize: 10, color: theme.primary }}> ✎</Text>}
                         </Text>
                     </View>
 
@@ -209,11 +240,55 @@ export default function BudgetScreen() {
         );
     };
 
+    const Footer = () => {
+        // Calculate totals for Top Level items (depth === 0)
+        const topLevelItems = data.filter(item => item.depth === 0);
+        const totalBudget = topLevelItems.reduce((acc, curr) => acc + (curr.mtd_budget || 0), 0);
+        const totalActual = topLevelItems.reduce((acc, curr) => acc + (curr.mtd_actual || 0), 0);
+
+        const variance = totalActual - totalBudget;
+        const isPositiveVar = variance > 0;
+        const varColor = isPositiveVar ? theme.destructive : theme.success;
+        const badgeBg = isPositiveVar ? theme.badgeDestructiveBg : theme.badgeSuccessBg;
+
+        return (
+            <View style={styles.footerRow}>
+                <View style={[styles.nameCol, { paddingLeft: 16 }]}>
+                    <Text style={styles.footerLabel}>Total</Text>
+                </View>
+                <View style={styles.valueCol}>
+                    <Text style={styles.footerAmount}>${totalActual.toLocaleString()}</Text>
+                    <Text style={styles.footerSub}>of ${totalBudget.toLocaleString()}</Text>
+                </View>
+                <View style={styles.varCol}>
+                    <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+                        {isPositiveVar ? <TrendingUp size={12} color={varColor} /> : <TrendingDown size={12} color={varColor} />}
+                        <Text style={[styles.varText, { color: varColor }]}>
+                            {Math.abs(variance).toLocaleString()}
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
+    const currentMonthKey = format(startDate, 'yyyy-MM-01');
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
                 <View style={styles.headerCard}>
-                    <Text style={styles.headerTitle}>Budget Summary</Text>
+                    <View style={styles.titleRow}>
+                        <Text style={styles.headerTitle}>Budget Summary</Text>
+                        <TouchableOpacity
+                            onPress={() => setIsEditing(!isEditing)}
+                            style={[styles.editBtn, isEditing && styles.editBtnActive]}
+                        >
+                            <Pencil size={18} color={isEditing ? theme.primaryForeground : theme.foreground} />
+                            {isEditing && <Text style={{ marginLeft: 4, color: theme.primaryForeground, fontWeight: '600' }}>Done</Text>}
+                        </TouchableOpacity>
+                    </View>
+
                     <View style={styles.dateControl}>
                         <TouchableOpacity onPress={() => toggleMonth(-1)} style={styles.iconBtn}>
                             <ArrowLeft size={20} color={theme.foreground} />
@@ -228,6 +303,12 @@ export default function BudgetScreen() {
                     </View>
                 </View>
 
+                {isEditing && (
+                    <View style={styles.editBanner}>
+                        <Text style={styles.editBannerText}>Tap a category to set budget for {format(startDate, 'MMM')}</Text>
+                    </View>
+                )}
+
                 <View style={styles.tableHeader}>
                     <Text style={[styles.th, { flex: 4 }]}>CATEGORY</Text>
                     <Text style={[styles.th, { flex: 3, textAlign: 'right' }]}>ACTUAL</Text>
@@ -241,11 +322,23 @@ export default function BudgetScreen() {
                         data={data}
                         keyExtractor={item => item.category_id}
                         renderItem={renderItem}
+                        ListFooterComponent={Footer}
                         contentContainerStyle={{ paddingBottom: 80 }}
                         showsVerticalScrollIndicator={false}
                     />
                 )}
             </View>
+
+            <BudgetEditModal
+                visible={!!editTarget}
+                onClose={() => setEditTarget(null)}
+                onSave={handleSaveBudget}
+                categoryName={editTarget?.category_name || ''}
+                monthLabel={format(startDate, 'MMMM yyyy')}
+                currentAmount={
+                    editTarget?.monthlyData?.[currentMonthKey]?.budget || 0
+                }
+            />
         </SafeAreaView>
     );
 }
@@ -270,11 +363,26 @@ const makeStyles = (theme: typeof LIGHT_THEME) => StyleSheet.create({
         borderBottomColor: theme.border,
         marginBottom: SPACING.sm,
     },
+    titleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: SPACING.md,
+    },
     headerTitle: {
         fontSize: 24,
         fontWeight: '700',
         color: theme.foreground,
-        marginBottom: SPACING.md,
+    },
+    editBtn: {
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: theme.muted,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    editBtnActive: {
+        backgroundColor: theme.primary,
     },
     dateControl: {
         flexDirection: 'row',
@@ -301,6 +409,18 @@ const makeStyles = (theme: typeof LIGHT_THEME) => StyleSheet.create({
         color: theme.mutedForeground,
         marginRight: SPACING.sm,
     },
+    editBanner: {
+        backgroundColor: theme.muted,
+        padding: SPACING.xs,
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: theme.border,
+    },
+    editBannerText: {
+        fontSize: 12,
+        color: theme.primary,
+        fontWeight: '600',
+    },
     tableHeader: {
         flexDirection: 'row',
         paddingHorizontal: SPACING.lg,
@@ -323,6 +443,9 @@ const makeStyles = (theme: typeof LIGHT_THEME) => StyleSheet.create({
         borderBottomColor: theme.muted,
         backgroundColor: theme.card,
         alignItems: 'flex-start',
+    },
+    editRow: {
+        backgroundColor: theme.muted,
     },
     rootRow: {
         backgroundColor: theme.card,
@@ -372,5 +495,30 @@ const makeStyles = (theme: typeof LIGHT_THEME) => StyleSheet.create({
     varText: {
         fontSize: 12,
         fontWeight: '600',
+    },
+    // Footer Styles
+    footerRow: {
+        flexDirection: 'row',
+        paddingVertical: SPACING.lg,
+        paddingRight: SPACING.lg,
+        backgroundColor: theme.card,
+        borderTopWidth: 2,
+        borderTopColor: theme.border,
+        marginTop: -1, // Overlap last divider
+    },
+    footerLabel: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: theme.foreground,
+    },
+    footerAmount: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: theme.foreground,
+    },
+    footerSub: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: theme.mutedForeground,
     },
 });
