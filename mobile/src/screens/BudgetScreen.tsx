@@ -1,7 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Platform, SafeAreaView } from 'react-native';
+import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
+import { ArrowLeft, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 import apiClient from '../lib/api';
+import { SPACING, LIGHT_THEME } from '../constants/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface MergedBudgetRecord {
     category_id: string;
@@ -15,9 +19,13 @@ interface MergedBudgetRecord {
 }
 
 export default function BudgetScreen() {
+    const theme = useTheme();
+    const styles = useMemo(() => makeStyles(theme), [theme]);
+    const navigation = useNavigation<any>();
+
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<MergedBudgetRecord[]>([]);
-    const [startDate] = useState(new Date()); // Today
+    const [startDate, setStartDate] = useState(new Date());
     const viewPeriod = 3;
 
     useEffect(() => {
@@ -54,8 +62,6 @@ export default function BudgetScreen() {
                     },
                 ])
             );
-
-            // Add uncategorized placeholder if needed, simplified here.
 
             const res = await apiClient.get<any[]>(
                 `/reports/monthly-comparison?startDate=${mtdStart}&endDate=${mtdEnd}`
@@ -137,57 +143,234 @@ export default function BudgetScreen() {
 
             setData(result);
         } catch (e: any) {
-            console.error("Error fetching budget:", e.response ? e.response.data : e.message);
+            console.error("Error fetching budget:", e.message);
         } finally {
             setLoading(false);
         }
     };
 
+    const toggleMonth = (dir: number) => {
+        setStartDate(prev => addMonths(prev, dir));
+    };
+
+    const handleDrillDown = (item: MergedBudgetRecord) => {
+        const mtdStart = format(startOfMonth(subMonths(startDate, viewPeriod - 1)), "yyyy-MM-dd");
+        const mtdEnd = format(endOfMonth(startDate), "yyyy-MM-dd");
+
+        navigation.navigate('Transactions', {
+            categoryId: item.category_id,
+            startDate: mtdStart,
+            endDate: mtdEnd,
+            title: item.category_name,
+        });
+    };
+
     const renderItem = ({ item }: { item: MergedBudgetRecord }) => {
-        const variance = (item.mtd_actual || 0) - (item.mtd_budget || 0);
-        // Assuming Expense: Positive variance is Overspending (Bad = Red)
-        // If Budget > Actual -> Green
-        // Variance: Actual - Budget. 
-        // 100 actual - 50 budget = +50 variance (Red).
-        const varColor = variance > 0 ? '#ef4444' : '#10b981';
+        const budget = item.mtd_budget || 0;
+        const actual = item.mtd_actual || 0;
+        const variance = actual - budget;
+        const isPositiveVar = variance > 0;
+        const varColor = isPositiveVar ? theme.destructive : theme.success;
+        const badgeBg = isPositiveVar ? theme.badgeDestructiveBg : theme.badgeSuccessBg;
 
         return (
-            <View style={[styles.row, { paddingLeft: (item.depth || 0) * 16 + 12 }]}>
-                <Text style={[styles.cell, styles.name, item.isParent && styles.bold]} numberOfLines={1}>
-                    {item.category_name}
-                </Text>
-                <Text style={[styles.cell, styles.rightAlign]}>${(item.mtd_actual || 0).toFixed(0)}</Text>
-                <Text style={[styles.cell, styles.rightAlign, { color: varColor }]}>${variance.toFixed(0)}</Text>
-            </View>
+            <TouchableOpacity onPress={() => handleDrillDown(item)} activeOpacity={0.7}>
+                <View style={[
+                    styles.row,
+                    item.depth === 0 && styles.rootRow,
+                    { paddingLeft: (item.depth || 0) * 12 + 16 }
+                ]}>
+                    <View style={styles.nameCol}>
+                        <Text style={[
+                            styles.cellText,
+                            item.isParent ? styles.parentText : styles.childText
+                        ]} numberOfLines={1}>
+                            {item.category_name}
+                        </Text>
+                    </View>
+
+                    <View style={styles.valueCol}>
+                        <Text style={styles.amountText}>${actual.toLocaleString()}</Text>
+                        {item.isParent && (
+                            <Text style={styles.subText}>of ${budget.toLocaleString()}</Text>
+                        )}
+                    </View>
+
+                    <View style={styles.varCol}>
+                        <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+                            {isPositiveVar ? <TrendingUp size={12} color={varColor} /> : <TrendingDown size={12} color={varColor} />}
+                            <Text style={[styles.varText, { color: varColor }]}>
+                                {Math.abs(variance).toLocaleString()}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            </TouchableOpacity>
         );
     };
 
-    if (loading) return <View style={styles.center}><ActivityIndicator size="large" /></View>;
-
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={[styles.cell, styles.name, styles.bold]}>Category</Text>
-                <Text style={[styles.cell, styles.rightAlign, styles.bold]}>Actual</Text>
-                <Text style={[styles.cell, styles.rightAlign, styles.bold]}>Var</Text>
+        <SafeAreaView style={styles.safeArea}>
+            <View style={styles.container}>
+                <View style={styles.headerCard}>
+                    <Text style={styles.headerTitle}>Budget Summary</Text>
+                    <View style={styles.dateControl}>
+                        <TouchableOpacity onPress={() => toggleMonth(-1)} style={styles.iconBtn}>
+                            <ArrowLeft size={20} color={theme.foreground} />
+                        </TouchableOpacity>
+                        <Text style={styles.dateText}>{format(startDate, "MMM yyyy")}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.periodLabel}>Last {viewPeriod} Mo</Text>
+                            <TouchableOpacity onPress={() => toggleMonth(1)} style={styles.iconBtn}>
+                                <ArrowRight size={20} color={theme.foreground} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+
+                <View style={styles.tableHeader}>
+                    <Text style={[styles.th, { flex: 4 }]}>CATEGORY</Text>
+                    <Text style={[styles.th, { flex: 3, textAlign: 'right' }]}>ACTUAL</Text>
+                    <Text style={[styles.th, { flex: 3, textAlign: 'right' }]}>VAR</Text>
+                </View>
+
+                {loading ? (
+                    <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
+                ) : (
+                    <FlatList
+                        data={data}
+                        keyExtractor={item => item.category_id}
+                        renderItem={renderItem}
+                        contentContainerStyle={{ paddingBottom: 80 }}
+                        showsVerticalScrollIndicator={false}
+                    />
+                )}
             </View>
-            <FlatList
-                data={data}
-                keyExtractor={item => item.category_id}
-                renderItem={renderItem}
-                contentContainerStyle={{ paddingBottom: 20 }}
-            />
-        </View>
+        </SafeAreaView>
     );
 }
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    row: { flexDirection: 'row', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', alignItems: 'center', paddingRight: 12 },
-    header: { flexDirection: 'row', padding: 12, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-    cell: { flex: 1, fontSize: 14, color: '#0f172a' },
-    name: { flex: 2 },
-    rightAlign: { textAlign: 'right' },
-    bold: { fontWeight: '600' },
+const makeStyles = (theme: typeof LIGHT_THEME) => StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: theme.background,
+    },
+    container: {
+        flex: 1,
+        maxWidth: Platform.OS === 'web' ? 600 : '100%',
+        alignSelf: 'center',
+        width: '100%',
+        backgroundColor: theme.background,
+    },
+    headerCard: {
+        backgroundColor: theme.card,
+        padding: SPACING.lg,
+        paddingBottom: SPACING.xl,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.border,
+        marginBottom: SPACING.sm,
+    },
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: theme.foreground,
+        marginBottom: SPACING.md,
+    },
+    dateControl: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: theme.muted,
+        borderRadius: 8,
+        padding: SPACING.xs,
+    },
+    iconBtn: {
+        padding: SPACING.sm,
+        backgroundColor: theme.card,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: theme.border,
+    },
+    dateText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: theme.foreground,
+    },
+    periodLabel: {
+        fontSize: 12,
+        color: theme.mutedForeground,
+        marginRight: SPACING.sm,
+    },
+    tableHeader: {
+        flexDirection: 'row',
+        paddingHorizontal: SPACING.lg,
+        paddingVertical: SPACING.md,
+        backgroundColor: theme.muted,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.border,
+    },
+    th: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: theme.mutedForeground,
+        letterSpacing: 0.5,
+    },
+    row: {
+        flexDirection: 'row',
+        paddingVertical: SPACING.md,
+        paddingRight: SPACING.lg,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.muted,
+        backgroundColor: theme.card,
+        alignItems: 'flex-start',
+    },
+    rootRow: {
+        backgroundColor: theme.card,
+    },
+    nameCol: {
+        flex: 4,
+        justifyContent: 'center',
+    },
+    valueCol: {
+        flex: 3,
+        alignItems: 'flex-end',
+    },
+    varCol: {
+        flex: 3,
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+    },
+    cellText: {
+        fontSize: 15,
+        color: theme.foreground,
+    },
+    parentText: {
+        fontWeight: '600',
+        color: theme.foreground,
+    },
+    childText: {
+        fontWeight: '400',
+        color: theme.mutedForeground,
+    },
+    amountText: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: theme.foreground,
+    },
+    subText: {
+        fontSize: 11,
+        color: theme.mutedForeground,
+    },
+    badge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 2,
+        paddingHorizontal: 6,
+        borderRadius: 12,
+        gap: 4,
+    },
+    varText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
 });

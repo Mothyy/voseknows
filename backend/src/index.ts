@@ -34,7 +34,12 @@ const port = 3001;
 
 // Middleware setup
 app.use(cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: [
+        process.env.FRONTEND_URL || "http://localhost:5173",
+        "http://localhost:8081", // Expo Web
+        "http://127.0.0.1:8081", // Expo Web alternate
+        "http://localhost:19006" // Expo Web legacy
+    ],
     credentials: true
 }));
 app.use(express.json());
