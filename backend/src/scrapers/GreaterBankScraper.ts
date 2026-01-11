@@ -1,5 +1,5 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
-import { BankScraper, ScraperConfig } from './types';
+import { BankScraper, ScraperConfig, ScraperAccount } from './types';
 import path from 'path';
 import fs from 'fs';
 
@@ -106,7 +106,7 @@ export class GreaterBankScraper implements BankScraper {
 
     private accountsDetails: any[] = [];
 
-    async getAccounts(): Promise<string[]> {
+    async getAccounts(): Promise<(string | ScraperAccount)[]> {
         if (!this.page) throw new Error("Not logged in");
 
         console.log("Fetching accounts list...");
@@ -121,7 +121,10 @@ export class GreaterBankScraper implements BankScraper {
                         name: acc.name,
                         number: acc.number,
                         id: acc.id,
-                        bsb: acc.bsb
+                        bsb: acc.bsb,
+                        type: acc.accountType,
+                        balance: acc.balance,
+                        available: acc.available
                     }));
                 }
                 return null;
@@ -129,8 +132,32 @@ export class GreaterBankScraper implements BankScraper {
 
             if (accounts) {
                 console.log(`Found ${accounts.length} accounts via App state.`);
-                this.accountsDetails = accounts;
-                return accounts.map((a: any) => `${a.name} (${a.number})`);
+
+                const processedAccounts: any[] = [];
+                for (const acc of accounts) {
+                    processedAccounts.push(acc);
+
+                    // Check for Loan Redraw opportunity (Type 3000 is Home Loan)
+                    // Check for redraw offset (Virtual Account)
+                    if (this.config.enableLoanRedraw && acc.available > 0 && (
+                        acc.type === '3000' ||
+                        acc.name.toLowerCase().includes('loan')
+                    )) {
+                        console.log(`Detected Loan with Available funds: ${acc.name}. Adding virtual Redraw account.`);
+                        processedAccounts.push({
+                            name: `${acc.name} - Redraw`,
+                            number: `${acc.number}-REDRAW`,
+                            id: `${acc.id}-REDRAW`,
+                            balance: acc.available,
+                            available: 0,
+                            isVirtual: true,
+                            type: 'Virtual'
+                        });
+                    }
+                }
+
+                this.accountsDetails = processedAccounts;
+                return processedAccounts;
             }
 
             // Fallback to DOM scraping
@@ -148,7 +175,7 @@ export class GreaterBankScraper implements BankScraper {
             });
 
             this.accountsDetails = domAccounts;
-            return domAccounts.map((a: any) => `${a.name} (${a.number})`);
+            return domAccounts;
 
         } catch (error) {
             console.error("Error fetching accounts:", error);
@@ -176,6 +203,11 @@ export class GreaterBankScraper implements BankScraper {
         console.log(`Starting transaction download for ${this.accountsDetails.length} accounts...`);
 
         for (const account of this.accountsDetails) {
+            if (account.isVirtual) {
+                console.log(`Skipping transaction download for virtual account: ${account.name}`);
+                continue;
+            }
+
             try {
                 // Construct URL or find link
                 const targetUrl = account.href

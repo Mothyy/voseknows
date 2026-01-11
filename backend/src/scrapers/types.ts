@@ -2,6 +2,11 @@
 export interface ScraperAccount {
     name: string;
     number?: string;
+    id?: string;
+    type?: string;
+    balance?: number;
+    available?: number;
+    isVirtual?: boolean;
 }
 
 export interface ScraperResult {
@@ -14,13 +19,14 @@ export interface ScraperConfig {
     username?: string;
     password?: string;
     securityNumber?: string;
+    enableLoanRedraw?: boolean;
     headless?: boolean;
     exportPath?: string;
 }
 
 export interface BankScraper {
     login(): Promise<boolean>;
-    getAccounts(): Promise<string[]>;
+    getAccounts(): Promise<(string | ScraperAccount)[]>;
     downloadTransactions(days?: number): Promise<boolean>;
     close(): Promise<void>;
 }

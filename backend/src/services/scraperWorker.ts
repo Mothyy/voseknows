@@ -164,12 +164,16 @@ export const runScraper = async (connectionId: string) => {
         const password = decrypt(connection.encrypted_password);
 
         let securityNumber = "";
+        let enableLoanRedraw = false;
         if (connection.encrypted_metadata) {
             try {
                 const decryptedMetadata = decrypt(connection.encrypted_metadata);
                 const metadata = JSON.parse(decryptedMetadata);
                 if (metadata.securityNumber) {
                     securityNumber = metadata.securityNumber;
+                }
+                if (metadata.enableLoanRedraw !== undefined) {
+                    enableLoanRedraw = metadata.enableLoanRedraw;
                 }
             } catch (e) {
                 console.error("Failed to decrypt or parse metadata:", e);
@@ -190,6 +194,7 @@ export const runScraper = async (connectionId: string) => {
             username,
             password,
             securityNumber,
+            enableLoanRedraw,
             headless: true,
             exportPath // Passed to scraper constructor
         };
@@ -197,6 +202,83 @@ export const runScraper = async (connectionId: string) => {
         const scraper = ScraperService.getScraper(connection.scraper_slug, config);
         try {
             await scraper.login();
+
+            // Sync Accounts from Scraper
+            if (scraper.getAccounts) {
+                const accounts = await scraper.getAccounts();
+                if (accounts && accounts.length > 0) {
+                    console.log(`Syncing ${accounts.length} accounts from scraper...`);
+                    const accountsMap = connection.accounts_map as Record<string, string> || {};
+
+                    for (const acc of accounts) {
+                        // Check if acc is object (Rich ScraperAccount)
+                        if (typeof acc !== 'string') {
+                            const providerId = acc.number || acc.id;
+                            if (!providerId) continue;
+
+                            // Calculate Type
+                            const accountType = (acc.name.toLowerCase().includes('loan') || (acc.type === '3000')) ? 'LOAN' : 'BANK';
+                            const mapKey = `${acc.name} (${acc.number})`;
+
+                            let targetAccountId = accountsMap[mapKey];
+
+                            // If no map match, try to find by provider_account_id
+                            if (!targetAccountId) {
+                                const { rows: existing } = await query(
+                                    `SELECT id FROM accounts WHERE provider_account_id = $1`,
+                                    [providerId]
+                                );
+                                if (existing.length > 0) targetAccountId = existing[0].id;
+                            }
+
+                            if (!targetAccountId) {
+                                // Create new account
+                                console.log(`Creating new account: ${acc.name} (${acc.isVirtual ? 'Virtual' : 'Real'})`);
+                                await query(
+                                    `INSERT INTO accounts (
+                                         id, user_id, name, type, provider_account_id, balance, available_balance, last_scraped_at
+                                     ) VALUES (
+                                         gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW()
+                                     )`,
+                                    [
+                                        connection.user_id,
+                                        acc.name,
+                                        accountType,
+                                        providerId,
+                                        acc.balance || 0,
+                                        acc.available || null
+                                    ]
+                                );
+                            } else {
+                                // Update existing
+                                console.log(`Updating account: ${acc.name} (${targetAccountId})`);
+
+                                // Always update metadata. 
+                                // Important: Set provider_account_id if missing (Self-Healing)
+                                const available = acc.available !== undefined ? acc.available : null;
+
+                                // If virtual, we enforce balance update (snapshot). 
+                                // If real, we DO NOT touch balance (as it's managed by transactions), unless we want to seed it? 
+                                // (Actually, preserve real account balance logic).
+
+                                let sql = `UPDATE accounts SET last_scraped_at = NOW(), available_balance = $2, provider_account_id = $3`;
+                                const params: any[] = [targetAccountId, available, providerId];
+                                let pIdx = 4;
+
+                                if (acc.isVirtual) {
+                                    sql += `, balance = $${pIdx}`;
+                                    params.push(acc.balance || 0);
+                                    pIdx++;
+                                }
+
+                                sql += ` WHERE id = $1`;
+                                await query(sql, params);
+                            }
+                        }
+                    }
+                }
+            }
+
             await scraper.downloadTransactions(); // Downloads to exportPath
             await scraper.close();
             console.log(`${connection.scraper_slug.toUpperCase()} Scraper finished successfully`);

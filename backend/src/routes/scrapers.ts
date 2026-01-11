@@ -1,7 +1,7 @@
 import express from "express";
 const router = express.Router();
 import { query } from "../db";
-import { encrypt } from "../lib/encryption";
+import { encrypt, decrypt } from "../lib/encryption";
 import path from "path";
 import fs from "fs";
 const auth = require("../middleware/auth");
@@ -23,11 +23,18 @@ router.get("/", async (req: any, res: Response) => {
             console.error("Schema migration error (ignored):", e);
         }
 
-        // Auto-seed Amex if missing (Temporary Fix)
+        // Auto-seed Amex if missing
         const amexCheck = await query("SELECT 1 FROM scrapers WHERE slug = 'amex'", []);
         if (amexCheck.rows.length === 0) {
             console.log("Seeding Amex scraper...");
             await query("INSERT INTO scrapers (name, slug) VALUES ('American Express', 'amex')", []);
+        }
+
+        // Auto-seed Westpac if missing
+        const wbcCheck = await query("SELECT 1 FROM scrapers WHERE slug = 'wbc'", []);
+        if (wbcCheck.rows.length === 0) {
+            console.log("Seeding Westpac scraper...");
+            await query("INSERT INTO scrapers (name, slug) VALUES ('Westpac', 'wbc')", []);
         }
 
         const { rows } = await query("SELECT * FROM scrapers", []);
@@ -54,7 +61,26 @@ router.get("/connections", async (req: any, res: Response) => {
              ORDER BY c.name ASC`,
             [req.user.id]
         );
-        res.json(rows);
+
+        // Decrypt metadata for frontend (Sanitized)
+        const sanitizedRows = rows.map((row: any) => {
+            let metadata: any = {};
+            if (row.encrypted_metadata) {
+                try {
+                    const decrypted = decrypt(row.encrypted_metadata);
+                    metadata = JSON.parse(decrypted);
+                    // Sanitize sensitive fields
+                    delete metadata.securityNumber;
+                    delete metadata.password;
+                    delete metadata.pin;
+                } catch (e) {
+                    console.error("Failed to decrypt metadata for connection", row.id);
+                }
+            }
+            return { ...row, metadata };
+        });
+
+        res.json(sanitizedRows);
     } catch (err: any) {
         console.error("Fetch Connections Error:", err);
         if (err.stack) console.error(err.stack);
@@ -106,8 +132,28 @@ router.put("/connections/:id", async (req: any, res: Response) => {
         const updatePassword = password ? encrypt(password) : conn.encrypted_password;
         const updateAccountId = account_id !== undefined ? account_id : conn.account_id;
         const updateDateFormat = date_format || conn.date_format;
-        const updateMetadata = metadata ? encrypt(JSON.stringify(metadata)) : conn.encrypted_metadata;
         const updateAccountsMap = accounts_map !== undefined ? accounts_map : conn.accounts_map;
+
+        // Smart Metadata Merge
+        let currentMetadata: any = {};
+        if (conn.encrypted_metadata) {
+            try {
+                currentMetadata = JSON.parse(decrypt(conn.encrypted_metadata));
+            } catch (e) {
+                console.error("Failed to decrypt existing metadata during update", e);
+            }
+        }
+
+        let newMetadata = currentMetadata;
+        if (metadata) {
+            newMetadata = { ...currentMetadata, ...metadata };
+            // Restore sensitive fields if missing in update but present in DB
+            if (!metadata.securityNumber && currentMetadata.securityNumber) {
+                newMetadata.securityNumber = currentMetadata.securityNumber;
+            }
+        }
+
+        const updateMetadata = Object.keys(newMetadata).length > 0 ? encrypt(JSON.stringify(newMetadata)) : conn.encrypted_metadata;
 
         const { rows } = await query(
             `UPDATE automated_connections 
@@ -187,8 +233,8 @@ router.post("/connections/test", async (req: any, res: Response) => {
         }
         const scraperSlug = scraperResult.rows[0].slug;
 
-        // Use Node.js scraper for BOM and Greater Bank
-        if (scraperSlug.toLowerCase() === 'bom' || scraperSlug.toLowerCase() === 'greater' || scraperSlug.toLowerCase() === 'amex') {
+        // Use Node.js scraper for BOM, Greater Bank, Amex, Westpac
+        if (['bom', 'greater', 'amex', 'wbc', 'westpac'].includes(scraperSlug.toLowerCase())) {
             console.log(`Using Node.js ${scraperSlug} scraper for test...`);
             const scraper = ScraperService.getScraper(scraperSlug, {
                 username,

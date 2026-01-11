@@ -57,6 +57,7 @@ interface Connection {
     accounts_map?: Record<string, string>;
     frequency?: string;
     preferred_time?: string;
+    metadata?: any;
 }
 
 export const BankConnections: React.FC = () => {
@@ -80,6 +81,7 @@ export const BankConnections: React.FC = () => {
     const [securityNumber, setSecurityNumber] = useState("");
     const [accountMapping, setAccountMapping] = useState<Record<string, string>>({});
     const [foundAccounts, setFoundAccounts] = useState<string[]>([]);
+    const [enableLoanRedraw, setEnableLoanRedraw] = useState(false);
 
     // Dialog state
     const [connectionToDelete, setConnectionToDelete] = useState<Connection | null>(null);
@@ -153,7 +155,11 @@ export const BankConnections: React.FC = () => {
         // Actually we assume it's blank on load for security, unless we want to indicate "Set"
 
         setFrequency(conn.frequency || "daily");
+        setFrequency(conn.frequency || "daily");
         setPreferredTime(conn.preferred_time || "");
+
+        // Load Redraw Setting
+        setEnableLoanRedraw(!!conn.metadata?.enableLoanRedraw);
 
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -171,7 +177,9 @@ export const BankConnections: React.FC = () => {
         setDateFormat("YYYY-MM-DD");
         setSecurityNumber("");
         setAccountMapping({});
+        setAccountMapping({});
         setFoundAccounts([]);
+        setEnableLoanRedraw(false);
         setShowForm(false);
     };
 
@@ -230,8 +238,11 @@ export const BankConnections: React.FC = () => {
                 date_format: dateFormat,
                 username: username || undefined,
                 password: password || undefined,
-                // Send metadata if scraper requires it and we have a value
-                metadata: (scraperObj?.requires_security_pin && securityNumber) ? { securityNumber } : undefined,
+                // Send metadata
+                metadata: {
+                    ...(scraperObj?.requires_security_pin && securityNumber ? { securityNumber } : {}),
+                    enableLoanRedraw
+                },
                 accounts_map: accountMapping
             };
 
@@ -427,6 +438,31 @@ export const BankConnections: React.FC = () => {
                                     </div>
                                 )}
 
+                                {selectedScraperObj?.slug === 'greater' && (
+                                    <div className="space-y-2 border-t pt-4 mt-2">
+                                        <div className="flex items-start space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                id="enable_redraw"
+                                                checked={enableLoanRedraw}
+                                                onChange={(e) => setEnableLoanRedraw(e.target.checked)}
+                                                className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
+                                            />
+                                            <div className="grid gap-1.5 leading-none">
+                                                <Label
+                                                    htmlFor="enable_redraw"
+                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    Track Loan Redraw / Offset
+                                                </Label>
+                                                <p className="text-[10.5px] text-muted-foreground">
+                                                    If enabled, we'll create a separate asset account for any available funds in your loan account.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {(foundAccounts.length > 0 || Object.keys(accountMapping).length > 0) && (
                                     <div className="space-y-3 pt-4 border-t mt-4 animate-in fade-in slide-in-from-top-2 duration-300 col-span-full">
                                         <div>
@@ -436,30 +472,39 @@ export const BankConnections: React.FC = () => {
                                             </p>
                                         </div>
                                         <div className="grid gap-4 bg-muted/30 p-4 rounded-lg border border-border">
-                                            {(foundAccounts.length > 0 ? foundAccounts : Object.keys(accountMapping)).map(remoteName => (
-                                                <div key={remoteName} className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-                                                    <div className="flex items-center gap-2 min-w-0">
-                                                        <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 text-xs font-bold border border-indigo-200">
-                                                            {remoteName.substring(0, 2).toUpperCase()}
+                                            {(foundAccounts.length > 0 ? foundAccounts : Object.keys(accountMapping)).map((accountOrName: any) => {
+                                                const isObj = typeof accountOrName !== 'string';
+                                                const nameStr = isObj ? String(accountOrName.name) : String(accountOrName);
+                                                const numberStr = isObj && accountOrName.number ? String(accountOrName.number) : '';
+
+                                                // Unique key for the UI and Mapping
+                                                const uniqueId = isObj && numberStr ? `${nameStr} (${numberStr})` : nameStr;
+
+                                                return (
+                                                    <div key={uniqueId} className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 text-xs font-bold border border-indigo-200">
+                                                                {nameStr.substring(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <span className="text-sm font-medium truncate" title={nameStr}>
+                                                                {uniqueId}
+                                                            </span>
                                                         </div>
-                                                        <span className="text-sm font-medium truncate" title={remoteName}>
-                                                            {remoteName}
-                                                        </span>
+                                                        <div className="flex-1 sm:max-w-[250px]">
+                                                            <select
+                                                                className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-ring focus:border-input"
+                                                                value={accountMapping[uniqueId] || ""}
+                                                                onChange={e => setAccountMapping({ ...accountMapping, [uniqueId]: e.target.value })}
+                                                            >
+                                                                <option value="">-- Select Local Account --</option>
+                                                                {accounts.map(a => (
+                                                                    <option key={a.id} value={a.id}>{a.name} ({a.type})</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex-1 sm:max-w-[250px]">
-                                                        <select
-                                                            className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-ring focus:border-input"
-                                                            value={accountMapping[remoteName] || ""}
-                                                            onChange={e => setAccountMapping({ ...accountMapping, [remoteName]: e.target.value })}
-                                                        >
-                                                            <option value="">-- Select Local Account --</option>
-                                                            {accounts.map(a => (
-                                                                <option key={a.id} value={a.id}>{a.name} ({a.type})</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
@@ -510,8 +555,10 @@ export const BankConnections: React.FC = () => {
                                                     <div className="mt-2 text-sm text-green-800">
                                                         <p className="font-medium mb-1">Found Accounts:</p>
                                                         <ul className="list-disc pl-5 space-y-1">
-                                                            {testResult.accounts.map((acct, i) => (
-                                                                <li key={i}>{acct}</li>
+                                                            {testResult.accounts.map((acct: any, i) => (
+                                                                <li key={i}>
+                                                                    {typeof acct === 'string' ? acct : `${acct.name} (${acct.number || ''})`}
+                                                                </li>
                                                             ))}
                                                         </ul>
                                                     </div>
