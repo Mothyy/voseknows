@@ -293,6 +293,82 @@ export const columns: ColumnDef<Transaction>[] = [
         },
     },
     {
+        id: "debit",
+        accessorFn: (row) => row.amount,
+        header: ({ column }) => (
+            <div className="text-right">
+                <Button
+                    variant="ghost"
+                    onClick={() => cycleSort(column)}
+                    className="text-red-600 hover:text-red-700"
+                >
+                    Debit
+                    {column.getIsSorted() === "asc" ? (
+                        <ArrowUp className="ml-2 h-4 w-4" />
+                    ) : column.getIsSorted() === "desc" ? (
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                    ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                    )}
+                </Button>
+            </div>
+        ),
+        cell: ({ row }) => {
+            const val = row.getValue("debit");
+            const amount = typeof val === "string" ? parseFloat(val) : Number(val);
+            if (amount >= 0) return <div className="text-right text-muted-foreground">-</div>;
+
+            const formatted = new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD",
+            }).format(Math.abs(amount));
+
+            return (
+                <div className="text-right font-medium text-red-600">
+                    {formatted}
+                </div>
+            );
+        },
+    },
+    {
+        id: "credit",
+        accessorFn: (row) => row.amount,
+        header: ({ column }) => (
+            <div className="text-right">
+                <Button
+                    variant="ghost"
+                    onClick={() => cycleSort(column)}
+                    className="text-green-600 hover:text-green-700"
+                >
+                    Credit
+                    {column.getIsSorted() === "asc" ? (
+                        <ArrowUp className="ml-2 h-4 w-4" />
+                    ) : column.getIsSorted() === "desc" ? (
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                    ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                    )}
+                </Button>
+            </div>
+        ),
+        cell: ({ row }) => {
+            const val = row.getValue("credit");
+            const amount = typeof val === "string" ? parseFloat(val) : Number(val);
+            if (amount <= 0) return <div className="text-right text-muted-foreground">-</div>;
+
+            const formatted = new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD",
+            }).format(amount);
+
+            return (
+                <div className="text-right font-medium text-green-600">
+                    {formatted}
+                </div>
+            );
+        },
+    },
+    {
         accessorKey: "is_transfer",
         header: "Transfer",
         cell: ({ row }) => {

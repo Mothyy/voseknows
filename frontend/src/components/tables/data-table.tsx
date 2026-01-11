@@ -77,7 +77,8 @@ export function DataTable<TData, TValue>({
     totalCount,
     sorting: controlledSorting,
     onSortingChange: setControlledSorting,
-}: DataTableProps<TData, TValue>) {
+    tableId = "data-table", // Default ID
+}: DataTableProps<TData, TValue> & { tableId?: string }) {
     const [internalSorting, setInternalSorting] = React.useState<SortingState>([]);
 
     const sorting = controlledSorting !== undefined ? controlledSorting : internalSorting;
@@ -86,8 +87,32 @@ export function DataTable<TData, TValue>({
 
     const [columnFilters, setColumnFilters] =
         React.useState<ColumnFiltersState>([]);
-    const [columnVisibility, setColumnVisibility] =
-        React.useState<VisibilityState>({});
+
+    // Load initial visibility from localStorage
+    const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(() => {
+        if (typeof window !== "undefined" && tableId) {
+            const saved = localStorage.getItem(`voseknows-table-columns-${tableId}`);
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {
+                    console.error("Failed to parse saved column visibility", e);
+                }
+            }
+        }
+        return {};
+    });
+
+    // Save visibility changes to localStorage
+    React.useEffect(() => {
+        if (tableId) {
+            localStorage.setItem(
+                `voseknows-table-columns-${tableId}`,
+                JSON.stringify(columnVisibility)
+            );
+        }
+    }, [columnVisibility, tableId]);
+
     const [expanded, setExpanded] = React.useState<ExpandedState>({});
 
     // Group data by transfer_id
@@ -296,7 +321,7 @@ export function DataTable<TData, TValue>({
                             Columns <ChevronDown className="ml-2 h-4 w-4" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="w-56">
                         {table
                             .getAllColumns()
                             .filter((column) => column.getCanHide())

@@ -373,6 +373,7 @@ const TransactionsPage: React.FC = () => {
                 onRowSelectionChange={setRowSelection}
                 sorting={sorting}
                 onSortingChange={setSorting}
+                tableId="transactions-table"
             />
         );
     };

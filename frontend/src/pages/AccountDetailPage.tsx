@@ -295,7 +295,7 @@ const AccountDetailPage: React.FC = () => {
                         </div>
                     </CardHeader>
                     <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <AreaChart data={displayHistory}>
                                 <defs>
                                     <linearGradient
@@ -369,8 +369,8 @@ const AccountDetailPage: React.FC = () => {
                         </div>
                     </CardHeader>
                     <CardContent className="h-[300px] flex flex-col md:flex-row items-center">
-                        <div className="w-full h-full">
-                            <ResponsiveContainer width="100%" height="100%">
+                        <div className="w-full h-full min-w-0">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                 <PieChart>
                                     <Pie
                                         data={categorySummary}
