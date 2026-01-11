@@ -349,6 +349,18 @@ const TransactionsPage: React.FC = () => {
         return flatten(categories);
     }, [categories]);
 
+    const handleTransactionsUpdated = (updated: Partial<Transaction>[]) => {
+        setData((prevData) => {
+            const updatedMap = new Map(updated.map((u) => [u.id, u]));
+            return prevData.map((txn) => {
+                if (updatedMap.has(txn.id)) {
+                    return { ...txn, ...updatedMap.get(txn.id) } as Transaction;
+                }
+                return txn;
+            });
+        });
+    };
+
     const renderContent = () => {
         if (error) {
             return (
@@ -363,6 +375,7 @@ const TransactionsPage: React.FC = () => {
                 data={data}
                 filterColumnId="description"
                 refreshData={() => fetchTransactions(true, 1)}
+                onTransactionsUpdated={handleTransactionsUpdated}
                 categories={categories}
                 accounts={accounts}
                 onSearch={setSearchQuery}

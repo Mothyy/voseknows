@@ -126,6 +126,7 @@ const cycleSort = (column: Column<Transaction, unknown>) => {
 export const columns: ColumnDef<Transaction>[] = [
     {
         id: "select",
+        size: 40,
         header: ({ table }) => (
             <Checkbox
                 checked={
@@ -186,6 +187,7 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         accessorKey: "date",
+        size: 110,
         header: ({ column }) => {
             return (
                 <Button
@@ -209,6 +211,7 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         accessorKey: "description",
+        size: 400,
         header: ({ column }) => (
             <Button
                 variant="ghost"
@@ -232,6 +235,7 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         accessorKey: "account",
+        size: 150,
         header: ({ column }) => (
             <Button
                 variant="ghost"
@@ -254,6 +258,7 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         accessorKey: "amount",
+        size: 120,
         header: ({ column }) => (
             <div className="text-right">
                 <Button
@@ -294,6 +299,7 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         id: "debit",
+        size: 120,
         accessorFn: (row) => row.amount,
         header: ({ column }) => (
             <div className="text-right">
@@ -332,6 +338,7 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         id: "credit",
+        size: 120,
         accessorFn: (row) => row.amount,
         header: ({ column }) => (
             <div className="text-right">
@@ -371,6 +378,7 @@ export const columns: ColumnDef<Transaction>[] = [
     {
         accessorKey: "is_transfer",
         header: "Transfer",
+        size: 80,
         cell: ({ row }) => {
             return row.getValue("is_transfer") ? (
                 <div className="flex justify-center">
@@ -381,6 +389,7 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         accessorKey: "balance",
+        size: 120,
         header: () => <div className="text-right">Balance</div>,
         cell: ({ row }) => {
             if (row.getCanExpand()) return null;
@@ -406,6 +415,7 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         accessorKey: "category",
+        size: 150,
         header: ({ column }) => (
             <Button
                 variant="ghost"
@@ -427,6 +437,7 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         accessorKey: "status",
+        size: 100,
         header: ({ column }) => (
             <Button
                 variant="ghost"
@@ -461,6 +472,7 @@ export const columns: ColumnDef<Transaction>[] = [
     },
     {
         id: "actions",
+        size: 50,
         cell: ({ row, table }) => (
             <TransactionActions row={row} table={table} />
         ),

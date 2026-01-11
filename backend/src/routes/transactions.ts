@@ -224,10 +224,14 @@ router.post("/bulk-update", async (req: any, res: Response) => {
             UPDATE transactions
             SET ${setClauses.join(", ")}
             WHERE id = ANY($${paramIndex}::uuid[]) AND user_id = $${paramIndex + 1}
+            RETURNING id, is_transfer, transfer_id, category_id;
         `;
-        const { rowCount } = await query(sql, values);
+        const { rows } = await query(sql, values);
 
-        res.json({ message: `Successfully updated ${rowCount} transactions` });
+        res.json({
+            message: `Successfully updated ${rows.length} transactions`,
+            updated: rows
+        });
     } catch (err: any) {
         console.error("Error bulk updating transactions:", err);
         res.status(500).json({ error: "Internal Server Error" });

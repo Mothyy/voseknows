@@ -78,8 +78,19 @@ export function DataTable<TData, TValue>({
     sorting: controlledSorting,
     onSortingChange: setControlledSorting,
     tableId = "data-table", // Default ID
-}: DataTableProps<TData, TValue> & { tableId?: string }) {
+    onTransactionsUpdated,
+}: DataTableProps<TData, TValue> & { tableId?: string; onTransactionsUpdated?: (updated: any[]) => void }) {
     const [internalSorting, setInternalSorting] = React.useState<SortingState>([]);
+
+    // ... (rest of the code) ...
+
+    // We need to keep the context lines correct, so I'll just target the function signature and the handleMarkAsTransfer function separately? 
+    // No, I can do it in one go if I include enough context, but the file is large. 
+    // I already requested lines 64-468.
+    // Let's do two edits. One for props, one for handler. 
+    // Wait, replace_file_content doesn't support multiple chunks properly if I don't use multi_replace.
+    // I will use multi_replace_file_content.
+
 
     const sorting = controlledSorting !== undefined ? controlledSorting : internalSorting;
     const setSorting = setControlledSorting !== undefined ? setControlledSorting : setInternalSorting;
@@ -181,6 +192,22 @@ export function DataTable<TData, TValue>({
         return result;
     }, [data]);
 
+    // Auto-expand transfer groups
+    React.useEffect(() => {
+        setExpanded((prev) => {
+            if (prev === true) return true;
+
+            const nextExpanded: Record<string, boolean> = {};
+            groupedData.forEach((row: any) => {
+                if (row.id && String(row.id).startsWith("group-")) {
+                    nextExpanded[row.id] = true;
+                }
+            });
+
+            return { ...nextExpanded, ...prev };
+        });
+    }, [groupedData]);
+
     // Track last clicked row for shift-select (passed to columns via meta)
     const lastSelectedRowId = React.useRef<string | null>(null);
 
@@ -221,13 +248,16 @@ export function DataTable<TData, TValue>({
         if (selectedIds.length === 0) return;
 
         try {
-            await apiClient.post("/transactions/bulk-update", {
+            const response = await apiClient.post("/transactions/bulk-update", {
                 transactionIds: selectedIds,
                 is_transfer: true,
             });
-            if (refreshData) {
+
+            if (response.data.updated && onTransactionsUpdated) {
+                onTransactionsUpdated(response.data.updated);
+                onRowSelectionChange?.({});
+            } else if (refreshData) {
                 refreshData();
-                // Optionally clear selection?
                 onRowSelectionChange?.({});
             }
         } catch (error) {
@@ -342,12 +372,12 @@ export function DataTable<TData, TValue>({
             </div>
 
             <div className="rounded-md border">
-                <Table>
+                <Table className="table-fixed">
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => (
-                                    <TableHead key={header.id}>
+                                    <TableHead key={header.id} style={{ width: header.getSize() }}>
                                         {!header.isPlaceholder &&
                                             flexRender(
                                                 header.column.columnDef.header,
