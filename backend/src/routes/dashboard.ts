@@ -22,22 +22,48 @@ router.get("/", async (req: any, res: Response) => {
 
     try {
         const userId = req.user.id;
-        const [summary, worthOverTime, categoryVariance] = await Promise.all([
+        const [summary, worthOverTime, categoryVariance, netBalances] = await Promise.all([
             getSummary(start as string, end as string, userId),
             getWorthOverTime(start as string, end as string, userId),
             getCategoryVariance(start as string, end as string, userId),
+            getNetBalances(userId),
         ]);
 
         res.json({
             ...summary,
             worthOverTime,
             categoryVariance,
+            netBalances,
         });
     } catch (err: any) {
         console.error("Error fetching dashboard data:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
+async function getNetBalances(userId: string) {
+    const sql = `
+        WITH account_balances AS (
+            SELECT
+                a.id,
+                a.include_in_budget,
+                (a.balance + COALESCE(SUM(t.amount), 0)) as current_balance
+            FROM accounts a
+            LEFT JOIN transactions t ON a.id = t.account_id
+            WHERE a.user_id = $1
+            GROUP BY a.id, a.include_in_budget, a.balance
+        )
+        SELECT
+            SUM(CASE WHEN include_in_budget = true THEN current_balance ELSE 0 END) as "netInBudget",
+            SUM(CASE WHEN include_in_budget IS NOT TRUE THEN current_balance ELSE 0 END) as "netNonBudget"
+        FROM account_balances
+    `;
+    const { rows } = await query(sql, [userId]);
+    return {
+        netInBudget: parseFloat(rows[0].netInBudget || "0"),
+        netNonBudget: parseFloat(rows[0].netNonBudget || "0"),
+    };
+}
 
 async function getSummary(startDate: string, endDate: string, userId: string) {
     const sql = `
@@ -48,7 +74,7 @@ async function getSummary(startDate: string, endDate: string, userId: string) {
             WHERE t.date >= $1 AND t.date <= $2
               AND a.include_in_budget = true
               AND t.category_id IS NOT NULL
-              AND t.is_transfer = false
+              AND COALESCE(t.is_transfer, false) = false
               AND t.user_id = $3
         ),
         total_budgets AS (

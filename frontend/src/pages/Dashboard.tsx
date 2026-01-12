@@ -52,9 +52,11 @@ interface DashboardData {
     variance: number;
     worthOverTime: { name: string; worth: number; budget: number }[];
     categoryVariance: { name: string; variance: number }[];
+    netBalances?: { netInBudget: number; netNonBudget: number };
 }
 
 const Dashboard: React.FC = () => {
+    // ... existing state hooks ...
     const [startMonth, setStartMonth] = React.useState<string>("January");
     const [startYear, setStartYear] = React.useState<number>(currentYear);
     const [endMonth, setEndMonth] = React.useState<string>("December");
@@ -110,6 +112,7 @@ const Dashboard: React.FC = () => {
         <div>
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-bold">Dashboard</h1>
+                {/* ... existing Selects ... */}
                 <div className="flex items-center space-x-2">
                     <Select value={startMonth} onValueChange={setStartMonth}>
                         <SelectTrigger className="w-[180px]">
@@ -173,6 +176,31 @@ const Dashboard: React.FC = () => {
             </div>
 
             {error && <p className="text-red-500">{error}</p>}
+
+            <div className="grid gap-4 md:grid-cols-2 mb-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Net Position (Budget)</CardTitle>
+                        <CardDescription>Current balance of all 'In Budget' accounts</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p className={cn("text-2xl font-bold", (data?.netBalances?.netInBudget ?? 0) < 0 ? "text-red-600" : "text-green-600")}>
+                            {loading ? "..." : formatCurrency(data?.netBalances?.netInBudget ?? 0)}
+                        </p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Net Position (Non-Budget)</CardTitle>
+                        <CardDescription>Current balance of all 'Non Budget' accounts</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p className={cn("text-2xl font-bold", (data?.netBalances?.netNonBudget ?? 0) < 0 ? "text-red-600" : "text-green-600")}>
+                            {loading ? "..." : formatCurrency(data?.netBalances?.netNonBudget ?? 0)}
+                        </p>
+                    </CardContent>
+                </Card>
+            </div>
 
             <div className="grid gap-4 md:grid-cols-3">
                 <Card>
