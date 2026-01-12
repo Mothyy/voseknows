@@ -274,8 +274,13 @@ export class WestpacScraper implements BankScraper {
                         return `${dd}/${mm}/${yyyy}`;
                     };
 
+                    await page.getByRole('textbox', { name: 'From' }).click();
                     await page.getByRole('textbox', { name: 'From' }).fill(formatDate(startDate));
+                    await page.keyboard.press('Tab');
+
+                    await page.getByRole('textbox', { name: 'To' }).click();
                     await page.getByRole('textbox', { name: 'To' }).fill(formatDate(endDate));
+                    await page.keyboard.press('Tab');
                 } else {
                     throw new Error("Date range tab not found");
                 }
@@ -301,7 +306,7 @@ export class WestpacScraper implements BankScraper {
                 console.error("Validation error present BEFORE Export:", await errorMsg.innerText());
             }
 
-            const downloadPromise = page.waitForEvent('download', { timeout: 120000 });
+            const downloadPromise = page.waitForEvent('download', { timeout: 120000 }).catch(() => null);
 
             await page.getByRole('button', { name: 'Export' }).click();
 
@@ -318,6 +323,8 @@ export class WestpacScraper implements BankScraper {
             }
 
             const download = await downloadPromise;
+            if (!download) throw new Error("Download failed, timed out, or browser closed.");
+
             const filename = `WBC_Export_${Date.now()}.ofx`;
             const filePath = path.join(this.exportDir, filename);
 

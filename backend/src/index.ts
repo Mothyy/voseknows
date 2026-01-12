@@ -29,6 +29,15 @@ import { startScheduler } from "./services/scraperWorker";
 // Configure dotenv to read .env file
 dotenv.config();
 
+// Global catch-all to prevent crashes from background workers (like scrapers)
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('CRITICAL: Uncaught Exception:', err);
+});
+
 const app = express();
 const port = 3001;
 
