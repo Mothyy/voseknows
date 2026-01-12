@@ -102,7 +102,7 @@ const LoginPage: React.FC = () => {
 
                     <CardFooter className="flex flex-col space-y-4 px-8 pb-10 pt-6">
                         <Button
-                            className="w-full h-11 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 active:scale-[0.98] transition-all"
+                            className="w-full h-11 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20 active:scale-[0.98] transition-all"
                             type="submit"
                             disabled={isSubmitting}
                         >
