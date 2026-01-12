@@ -107,7 +107,7 @@ router.get("/report", async (req: any, res: Response) => {
                 WHERE t.date >= $1 AND t.date <= $2
                   AND a.include_in_budget = true
                   AND t.category_id IS NOT NULL
-                  AND t.is_transfer = false
+                  AND COALESCE(t.is_transfer, false) = false
                   AND t.user_id = $4
                 GROUP BY t.category_id
             ),
@@ -125,6 +125,8 @@ router.get("/report", async (req: any, res: Response) => {
                 COALESCE(b.budget_amount, 0)::numeric(15, 2) as budget,
                 COALESCE(a.actual_amount, 0)::numeric(15, 2) as actual
             FROM categories c
+            LEFT JOIN monthly_budgets b ON c.id = b.category_id
+            LEFT JOIN monthly_actuals a ON c.id = a.category_id
             WHERE c.user_id = $4
             ORDER BY c.name ASC;
         `;
@@ -163,7 +165,7 @@ router.get("/summary", async (req: any, res: Response) => {
                 WHERE t.date >= $1
                   AND a.include_in_budget = true
                   AND t.category_id IS NOT NULL
-                  AND t.is_transfer = false
+                  AND COALESCE(t.is_transfer, false) = false
                   AND t.user_id = $2
                 GROUP BY t.category_id
             ),
