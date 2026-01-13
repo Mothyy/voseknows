@@ -8,6 +8,8 @@ const processScraperExports = async (connection: any, scraperRoot: string, conne
     const exportDir = exportDirOverride || path.join(scraperRoot, "exports");
     const { ImportService } = require("./importService");
     const importService = new ImportService();
+    let totalInserts = 0;
+    let totalDuplicates = 0;
 
     try {
         if (!fs.existsSync(exportDir)) {
@@ -35,7 +37,6 @@ const processScraperExports = async (connection: any, scraperRoot: string, conne
                     let targetAccountId = connection.account_id;
 
                     // Attempt to resolve specific account from map
-                    // Attempt to resolve specific account from map
                     if (connection.accounts_map) {
                         const baseName = scraperFile.substring(0, scraperFile.lastIndexOf('.'));
                         const prefixRegex = new RegExp(`^${connection.scraper_slug}_`, 'i');
@@ -57,7 +58,6 @@ const processScraperExports = async (connection: any, scraperRoot: string, conne
                         }
 
                         // Fallback: If no match found, but there is only ONE mapped account, use it.
-                        // This handles cases where filenames (Amex_Card) don't perfectly match the map key (My Amex)
                         if (!targetAccountId && mapEntries.length === 1) {
                             console.log("No exact filename match, but only one account mapped. Using it.");
                             targetAccountId = mapEntries[0][1];
@@ -87,6 +87,14 @@ const processScraperExports = async (connection: any, scraperRoot: string, conne
 
                     console.log(`Import complete for ${scraperFile}:`, importResult);
 
+                    // Aggregate stats
+                    if (importResult && importResult.accounts) {
+                        for (const accountStats of importResult.accounts) {
+                            totalInserts += accountStats.inserted || 0;
+                            totalDuplicates += accountStats.skipped || 0;
+                        }
+                    }
+
                     // Clean up
                     fs.unlinkSync(filePath);
                     successCount++;
@@ -112,7 +120,10 @@ const processScraperExports = async (connection: any, scraperRoot: string, conne
             "UPDATE automated_connections SET status = 'error', last_error = $2 WHERE id = $1",
             [connectionId, `Import failed: ${importErr.message}`]
         );
+        throw importErr; // Re-throw to be caught by runScraper
     }
+
+    return { inserts: totalInserts, duplicates: totalDuplicates };
 };
 
 const handleScraperError = async (connectionId: string, errorMessage: string) => {
@@ -124,6 +135,7 @@ const handleScraperError = async (connectionId: string, errorMessage: string) =>
 };
 
 export const runScraper = async (connectionId: string) => {
+    let logId: string | null = null;
     try {
         // 1. Fetch connection details
         const { rows } = await query(
@@ -137,13 +149,19 @@ export const runScraper = async (connectionId: string) => {
         if (rows.length === 0) throw new Error("Connection not found");
         const connection = rows[0];
 
-        // 2. Update status to running
+        // 2. Start Audit Log & Update Status
+        const logRes = await query(
+            `INSERT INTO scraper_logs (connection_id, status) VALUES ($1, 'running') RETURNING id`,
+            [connectionId]
+        );
+        logId = logRes.rows[0].id;
+
         await query(
             "UPDATE automated_connections SET status = 'running', last_run_at = NOW() WHERE id = $1",
             [connectionId]
         );
 
-        // Update schedule to prevent immediate re-run loops and respect preferred time
+        // Update schedule to prevent immediate re-run loops
         await query(
             `UPDATE scraping_schedules 
              SET next_run_at = CASE 
@@ -181,13 +199,10 @@ export const runScraper = async (connectionId: string) => {
         }
 
         // 4. Set up environment
-        // 4. Set up environment
         const scraperRoot = process.cwd();
 
         console.log(`Using native Node.js scraper for ${connection.scraper_slug.toUpperCase()}`);
 
-        // Isolate exports per connection to prevent cross-contamination
-        // Using connectionId ensures uniqueness even for same-bank duplicates
         const exportPath = path.join(scraperRoot, "exports", connectionId);
 
         const config = {
@@ -196,10 +211,12 @@ export const runScraper = async (connectionId: string) => {
             securityNumber,
             enableLoanRedraw,
             headless: true,
-            exportPath // Passed to scraper constructor
+            exportPath
         };
 
         const scraper = ScraperService.getScraper(connection.scraper_slug, config);
+        let finalStats = { inserts: 0, duplicates: 0 };
+
         try {
             await scraper.login();
 
@@ -211,18 +228,14 @@ export const runScraper = async (connectionId: string) => {
                     const accountsMap = connection.accounts_map as Record<string, string> || {};
 
                     for (const acc of accounts) {
-                        // Check if acc is object (Rich ScraperAccount)
                         if (typeof acc !== 'string') {
                             const providerId = acc.number || acc.id;
                             if (!providerId) continue;
 
-                            // Calculate Type
                             const accountType = (acc.name.toLowerCase().includes('loan') || (acc.type === '3000')) ? 'LOAN' : 'BANK';
                             const mapKey = `${acc.name} (${acc.number})`;
-
                             let targetAccountId = accountsMap[mapKey];
 
-                            // If no map match, try to find by provider_account_id
                             if (!targetAccountId) {
                                 const { rows: existing } = await query(
                                     `SELECT id FROM accounts WHERE provider_account_id = $1`,
@@ -232,7 +245,6 @@ export const runScraper = async (connectionId: string) => {
                             }
 
                             if (!targetAccountId) {
-                                // Create new account
                                 console.log(`Creating new account: ${acc.name} (${acc.isVirtual ? 'Virtual' : 'Real'})`);
                                 await query(
                                     `INSERT INTO accounts (
@@ -250,17 +262,8 @@ export const runScraper = async (connectionId: string) => {
                                     ]
                                 );
                             } else {
-                                // Update existing
                                 console.log(`Updating account: ${acc.name} (${targetAccountId})`);
-
-                                // Always update metadata. 
-                                // Important: Set provider_account_id if missing (Self-Healing)
                                 const available = acc.available !== undefined ? acc.available : null;
-
-                                // If virtual, we enforce balance update (snapshot). 
-                                // If real, we DO NOT touch balance (as it's managed by transactions), unless we want to seed it? 
-                                // (Actually, preserve real account balance logic).
-
                                 let sql = `UPDATE accounts SET last_scraped_at = NOW(), available_balance = $2, provider_account_id = $3`;
                                 const params: any[] = [targetAccountId, available, providerId];
                                 let pIdx = 4;
@@ -279,20 +282,53 @@ export const runScraper = async (connectionId: string) => {
                 }
             }
 
-            await scraper.downloadTransactions(); // Downloads to exportPath
+            await scraper.downloadTransactions();
             await scraper.close();
             console.log(`${connection.scraper_slug.toUpperCase()} Scraper finished successfully`);
 
-            await processScraperExports(connection, scraperRoot, connectionId, exportPath);
-            console.log(`Scraper logic for ${connection.scraper_slug} completed.`);
+            // Returns { inserts, duplicates }
+            finalStats = await processScraperExports(connection, scraperRoot, connectionId, exportPath);
+            console.log(`Scraper logic for ${connection.scraper_slug} completed. Stats:`, finalStats);
+
+            // Update Log success
+            if (logId) {
+                await query(
+                    `UPDATE scraper_logs 
+                     SET status = 'success', end_time = NOW(), inserts = $2, duplicates = $3 
+                     WHERE id = $1`,
+                    [logId, finalStats.inserts, finalStats.duplicates]
+                );
+            }
+
         } catch (err: any) {
-            console.error("Node Scraper failed:", err);
+            console.error("Node Scraper execution failed:", err);
             try { await scraper.close(); } catch (e) { }
-            await handleScraperError(connectionId, `Node Scraper error: ${err.message}`);
+
+            // Update Log failure (internal step)
+            if (logId) {
+                await query(
+                    `UPDATE scraper_logs 
+                     SET status = 'failed', end_time = NOW(), error_message = $2
+                     WHERE id = $1`,
+                    [logId, err.message]
+                );
+            }
+            throw err; // Re-throw to be caught by outer catch for connection status update
         }
 
     } catch (err: any) {
         console.error("Scraper Worker Error:", err);
+        // Ensure Log marked as failed if not already (in case validation failed before log created or after)
+        if (logId) {
+            try {
+                await query(
+                    `UPDATE scraper_logs 
+                     SET status = 'failed', end_time = NOW(), error_message = $2 
+                     WHERE id = $1 AND status = 'running'`,
+                    [logId, err.message]
+                );
+            } catch (e) { }
+        }
         await handleScraperError(connectionId, err.message);
     }
 };

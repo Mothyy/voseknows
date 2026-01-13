@@ -284,4 +284,25 @@ router.post("/connections/:id/run", async (req: any, res: Response) => {
     }
 });
 
+// @route   GET /api/scrapers/connections/:id/logs
+router.get("/connections/:id/logs", async (req: any, res: Response) => {
+    try {
+        const check = await query("SELECT id FROM automated_connections WHERE id = $1 AND user_id = $2", [req.params.id, req.user.id]);
+        if (check.rows.length === 0) return res.status(404).json({ error: "Connection not found" });
+
+        const { rows } = await query(
+            `SELECT id, status, start_time, end_time, inserts, duplicates, error_message 
+             FROM scraper_logs 
+             WHERE connection_id = $1 
+             ORDER BY start_time DESC 
+             LIMIT 50`,
+            [req.params.id]
+        );
+        res.json(rows);
+    } catch (err: any) {
+        console.error("Fetch Logs Error:", err);
+        res.status(500).json({ error: "Failed to fetch scraper logs" });
+    }
+});
+
 export default router;

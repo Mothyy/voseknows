@@ -27,6 +27,22 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription
+} from "@/components/ui/dialog";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { ScrollText } from "lucide-react";
 
 interface Scraper {
     id: string;
@@ -85,6 +101,26 @@ export const BankConnections: React.FC = () => {
 
     // Dialog state
     const [connectionToDelete, setConnectionToDelete] = useState<Connection | null>(null);
+
+    // Audit Logs State
+    const [viewLogsId, setViewLogsId] = useState<string | null>(null);
+    const [auditLogs, setAuditLogs] = useState<any[]>([]);
+    const [logsLoading, setLogsLoading] = useState(false);
+
+    const handleViewLogs = async (connId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setViewLogsId(connId);
+        setLogsLoading(true);
+        setAuditLogs([]);
+        try {
+            const res = await apiClient.get(`/scrapers/connections/${connId}/logs`);
+            setAuditLogs(res.data);
+        } catch (err) {
+            console.error("Fetch Logs Error:", err);
+        } finally {
+            setLogsLoading(false);
+        }
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -655,6 +691,15 @@ export const BankConnections: React.FC = () => {
                                             variant="ghost"
                                             size="icon"
                                             className="h-9 w-9 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50"
+                                            onClick={(e) => handleViewLogs(conn.id, e)}
+                                            title="View Scraper Logs"
+                                        >
+                                            <ScrollText className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-9 w-9 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50"
                                             onClick={() => handleEdit(conn)}
                                         >
                                             <Edit2 className="h-4 w-4" />
@@ -692,6 +737,70 @@ export const BankConnections: React.FC = () => {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <Dialog open={!!viewLogsId} onOpenChange={(open) => !open && setViewLogsId(null)}>
+                <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto w-full">
+                    <DialogHeader>
+                        <DialogTitle>Audit Logs</DialogTitle>
+                        <DialogDescription>
+                            History of scraper runs and imports.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="mt-4">
+                        {logsLoading ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : auditLogs.length === 0 ? (
+                            <p className="text-center py-8 text-muted-foreground">No logs found.</p>
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Start Time</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Inserts</TableHead>
+                                        <TableHead className="text-right">Duplicates</TableHead>
+                                        <TableHead>Duration</TableHead>
+                                        <TableHead>Message</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {auditLogs.map((log) => {
+                                        const start = new Date(log.start_time);
+                                        const end = log.end_time ? new Date(log.end_time) : null;
+                                        const durationMs = end ? end.getTime() - start.getTime() : 0;
+                                        const durationSec = Math.round(durationMs / 1000);
+
+                                        return (
+                                            <TableRow key={log.id}>
+                                                <TableCell className="whitespace-nowrap text-xs">
+                                                    {start.toLocaleString()}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize
+                                                        ${log.status === 'success' ? 'bg-green-100 text-green-800' :
+                                                            log.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
+                                                        {log.status}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className="text-right font-medium">{log.inserts}</TableCell>
+                                                <TableCell className="text-right text-muted-foreground">{log.duplicates}</TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    {end ? `${durationSec}s` : '...'}
+                                                </TableCell>
+                                                <TableCell className="text-xs max-w-[200px] truncate" title={log.error_message}>
+                                                    {log.error_message || "-"}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
