@@ -269,21 +269,50 @@ const Dashboard: React.FC = () => {
                     <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
                             <AreaChart data={data?.worthOverTime ?? []}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip />
+                                <defs>
+                                    <linearGradient id="colorWorth" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="colorBudget" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="#82ca9d" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <XAxis
+                                    dataKey="name"
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) => `$${value}`}
+                                />
+                                <Tooltip
+                                    contentStyle={{ backgroundColor: "#f3f4f6", border: "none", borderRadius: "8px" }}
+                                    itemStyle={{ color: "#111827" }}
+                                    formatter={(value: number) => ["$" + value.toLocaleString(), ""]}
+                                />
                                 <Area
                                     type="monotone"
                                     dataKey="worth"
                                     stroke="#8884d8"
-                                    fill="#8884d8"
+                                    fillOpacity={1}
+                                    fill="url(#colorWorth)"
+                                    name="Worth"
                                 />
                                 <Area
                                     type="monotone"
                                     dataKey="budget"
                                     stroke="#82ca9d"
-                                    fill="#82ca9d"
+                                    fillOpacity={1}
+                                    fill="url(#colorBudget)"
+                                    name="Budget"
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
@@ -296,11 +325,27 @@ const Dashboard: React.FC = () => {
                     <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
                             <BarChart data={data?.categoryVariance ?? []}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip />
-                                <Bar dataKey="variance" fill="#8884d8" />
+                                <XAxis
+                                    dataKey="name"
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) => `$${value}`}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'transparent' }}
+                                    contentStyle={{ backgroundColor: "#f3f4f6", border: "none", borderRadius: "8px" }}
+                                    itemStyle={{ color: "#111827" }}
+                                    formatter={(value: number) => ["$" + value.toLocaleString(), "Variance"]}
+                                />
+                                <Bar dataKey="variance" fill="#8884d8" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
