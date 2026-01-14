@@ -268,6 +268,27 @@ router.post("/connections/test", async (req: any, res: Response) => {
     }
 });
 
+// @route   POST /api/scrapers/connections/run-all
+router.post("/connections/run-all", async (req: any, res: Response) => {
+    try {
+        const { rows } = await query("SELECT id FROM automated_connections WHERE user_id = $1", [req.user.id]);
+
+        console.log(`Triggering specific run-all for ${rows.length} connections for user ${req.user.id}`);
+
+        // Trigger all asynchronously with a small stagger to avoid instant CPU spike
+        rows.forEach((row: any, index: number) => {
+            setTimeout(() => {
+                runScraper(row.id).catch(err => console.error(`Run All Error for ${row.id}:`, err));
+            }, index * 2000); // 2 second stagger
+        });
+
+        res.json({ message: `Triggered ${rows.length} scrapers` });
+    } catch (err) {
+        console.error("Run All Error:", err);
+        res.status(500).json({ error: "Failed to run all scrapers" });
+    }
+});
+
 // @route   POST /api/scrapers/connections/:id/run
 router.post("/connections/:id/run", async (req: any, res: Response) => {
     try {

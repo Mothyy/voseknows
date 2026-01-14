@@ -336,6 +336,20 @@ export const BankConnections: React.FC = () => {
         }
     };
 
+    const handleSyncAll = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            await apiClient.post("/scrapers/connections/run-all");
+            fetchData();
+        } catch (err: any) {
+            console.error("Sync All Error:", err);
+            setError("Failed to trigger sync all: " + (err.response?.data?.error || err.message));
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <Card className="shadow-md border-border">
@@ -350,13 +364,25 @@ export const BankConnections: React.FC = () => {
                                 Connect your bank accounts for automatic transaction syncing.
                             </CardDescription>
                         </div>
-                        <Button
-                            onClick={() => showForm ? resetForm() : setShowForm(true)}
-                            variant={showForm ? "outline" : "default"}
-                            className="gap-2"
-                        >
-                            {showForm ? "Cancel" : <><Plus className="h-4 w-4" /> Add Connection</>}
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={handleSyncAll}
+                                variant="secondary"
+                                className="gap-2"
+                                disabled={loading || connections.some(c => c.status === 'running')}
+                                title="Run all available scrapers"
+                            >
+                                <RefreshCw className={`h-4 w-4 ${loading && !showForm ? 'animate-spin' : ''}`} />
+                                Sync All
+                            </Button>
+                            <Button
+                                onClick={() => showForm ? resetForm() : setShowForm(true)}
+                                variant={showForm ? "outline" : "default"}
+                                className="gap-2"
+                            >
+                                {showForm ? "Cancel" : <><Plus className="h-4 w-4" /> Add Connection</>}
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
