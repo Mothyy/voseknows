@@ -38,6 +38,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshUser();
     }, []);
 
+    // Global interceptor for session timeouts (401)
+    useEffect(() => {
+        const interceptor = apiClient.interceptors.response.use(
+            (response) => response,
+            (error) => {
+                if (error.response && error.response.status === 401) {
+                    // Start of session timeout fix: clear user state to trigger redirect via ProtectedRoute
+                    setUser(null);
+                }
+                return Promise.reject(error);
+            }
+        );
+
+        return () => {
+            apiClient.interceptors.response.eject(interceptor);
+        };
+    }, []);
+
     const login = async (email: string, password: string) => {
         const res = await apiClient.post("/auth/login", { email, password });
         setUser(res.data);
