@@ -279,11 +279,8 @@ const TransactionsPage: React.FC = () => {
     const handleBulkCategorize = async () => {
         if (!bulkCategoryId) return;
 
-        // Map rowSelection indices to transaction IDs
-        const selectedIndices = Object.keys(rowSelection).map(Number);
-        const selectedIds = selectedIndices
-            .map((index) => data[index]?.id)
-            .filter(Boolean);
+        // Map rowSelection keys (transaction IDs) directly
+        const selectedIds = Object.keys(rowSelection);
 
         if (selectedIds.length === 0) return;
 

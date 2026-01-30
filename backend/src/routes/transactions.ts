@@ -313,10 +313,10 @@ router.post("/", async (req: any, res: Response) => {
  */
 router.patch("/:id", async (req: any, res: Response) => {
     const { id } = req.params;
-    const { category_id, description, status, date, amount } = req.body;
+    const { category_id, description, status, date, amount, is_transfer } = req.body;
 
     if (
-        [category_id, description, status, date, amount].every(
+        [category_id, description, status, date, amount, is_transfer].every(
             (field) => field === undefined,
         )
     ) {
@@ -346,12 +346,13 @@ router.patch("/:id", async (req: any, res: Response) => {
             status: status !== undefined ? status : currentTxn.status,
             date: date !== undefined ? date : currentTxn.date,
             amount: amount !== undefined ? amount : currentTxn.amount,
+            is_transfer: is_transfer !== undefined ? is_transfer : currentTxn.is_transfer,
         };
 
         const sql = `
             UPDATE transactions
-            SET category_id = $1, description = $2, status = $3, date = $4, amount = $5
-            WHERE id = $6 AND user_id = $7
+            SET category_id = $1, description = $2, status = $3, date = $4, amount = $5, is_transfer = $6
+            WHERE id = $7 AND user_id = $8
             RETURNING *;
         `;
         const { rows } = await query(sql, [
@@ -360,7 +361,7 @@ router.patch("/:id", async (req: any, res: Response) => {
             updatedTxn.status,
             updatedTxn.date,
             updatedTxn.amount,
-            updatedTxn.is_transfer !== undefined ? updatedTxn.is_transfer : currentTxn.is_transfer || false,
+            updatedTxn.is_transfer,
             id,
             req.user.id
         ]);

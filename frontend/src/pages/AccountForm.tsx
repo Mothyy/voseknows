@@ -43,6 +43,9 @@ const formSchema = z.object({
     }),
     balance: z.coerce.number().default(0),
     include_in_budget: z.boolean().default(true),
+    interest_rate: z.coerce.number().min(0).max(100).optional().default(0),
+    interest_start_date: z.string().optional().or(z.literal("")),
+    interest_type: z.enum(["simple", "compound"]).default("compound"),
 });
 
 type AccountFormValues = z.infer<typeof formSchema>;
@@ -70,6 +73,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
             type: undefined,
             balance: 0,
             include_in_budget: true,
+            interest_type: "compound",
         },
     });
 
@@ -85,6 +89,9 @@ const AccountForm: React.FC<AccountFormProps> = ({
                     | "loan",
                 balance: account.starting_balance,
                 include_in_budget: account.include_in_budget,
+                interest_rate: account.interest_rate || 0,
+                interest_start_date: account.interest_start_date ? account.interest_start_date.split('T')[0] : "",
+                interest_type: account.interest_type || "compound",
             });
         } else {
             form.reset({
@@ -92,6 +99,9 @@ const AccountForm: React.FC<AccountFormProps> = ({
                 type: undefined,
                 balance: 0,
                 include_in_budget: true,
+                interest_rate: 0,
+                interest_start_date: "",
+                interest_type: "compound",
             });
         }
     }, [account, isEditMode, form, isOpen]);
@@ -158,7 +168,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
                                     <FormLabel>Account Type</FormLabel>
                                     <Select
                                         onValueChange={field.onChange}
-                                        defaultValue={field.value}
+                                        value={field.value}
                                     >
                                         <FormControl>
                                             <SelectTrigger>
@@ -191,8 +201,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
                                 <FormItem>
                                     <FormLabel>Starting Balance</FormLabel>
                                     <FormDescription>
-                                        The balance before any imported
-                                        transactions.
+                                        The balance before any imported transactions.
                                     </FormDescription>
                                     <FormControl>
                                         <Input
@@ -205,6 +214,82 @@ const AccountForm: React.FC<AccountFormProps> = ({
                                 </FormItem>
                             )}
                         />
+
+                        {form.watch("type") === "loan" && (
+                            <>
+                                <FormField
+                                    control={form.control}
+                                    name="interest_rate"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Annual Interest Rate (%)</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    placeholder="0.00"
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormDescription>
+                                                The annual interest rate for this loan.
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="interest_start_date"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Interest Start Date</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="date"
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormDescription>
+                                                When should interest start being calculated?
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="interest_type"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Interest Type</FormLabel>
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                value={field.value}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select interest type" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="simple">
+                                                        Simple Interest
+                                                    </SelectItem>
+                                                    <SelectItem value="compound">
+                                                        Compound Interest
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormDescription>
+                                                How should interest be calculated?
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </>
+                        )}
                         <FormField
                             control={form.control}
                             name="include_in_budget"
@@ -251,7 +336,7 @@ const AccountForm: React.FC<AccountFormProps> = ({
                     </form>
                 </Form>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 };
 

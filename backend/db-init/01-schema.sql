@@ -35,6 +35,12 @@ CREATE TABLE IF NOT EXISTS accounts (
     type VARCHAR(50) NOT NULL, -- e.g., 'checking', 'savings', 'credit'
     balance NUMERIC(15, 2) NOT NULL DEFAULT 0,
     include_in_budget BOOLEAN NOT NULL DEFAULT true,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    interest_rate NUMERIC(5, 2) NOT NULL DEFAULT 0,
+    interest_start_date DATE,
+    interest_type VARCHAR(20) NOT NULL DEFAULT 'compound',
+    last_interest_applied_at DATE,
+    user_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
