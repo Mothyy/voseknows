@@ -1,64 +1,72 @@
 [
-    {
+  {
+    "title": "General",
+    "items": [
+      {
         "title": "Dashboard",
         "path": "/",
         "icon": "LayoutDashboard"
-    },
-    {
-        "title": "Finances",
-        "icon": "Landmark",
-        "children": [
-            {
-                "title": "Transactions",
-                "path": "/transactions",
-                "icon": "ArrowRightLeft"
-            },
-            {
-                "title": "Accounts",
-                "path": "/accounts",
-                "icon": "Wallet"
-            },
-            {
-                "title": "Categories",
-                "path": "/categories",
-                "icon": "Tags"
-            },
-            {
-                "title": "Rules",
-                "path": "/rules",
-                "icon": "Zap"
-            }
-        ]
-    },
-    {
-        "title": "Budgets",
-        "path": "/budgets",
-        "icon": "PiggyBank"
-    },
-    {
+      },
+      {
         "title": "Reports",
         "path": "/reports",
         "icon": "LineChart"
-    },
-    {
-        "title": "Settings",
-        "icon": "Cog",
-        "children": [
-            {
-                "title": "Profile",
-                "path": "/settings/profile",
-                "icon": "User"
-            },
-            {
-                "title": "Preferences",
-                "path": "/settings/preferences",
-                "icon": "SlidersHorizontal"
-            },
-            {
-                "title": "Connections",
-                "path": "/connections",
-                "icon": "Plug"
-            }
-        ]
-    }
+      }
+    ]
+  },
+  {
+    "title": "Finances",
+    "items": [
+      {
+        "title": "Transactions",
+        "path": "/transactions",
+        "icon": "ArrowRightLeft"
+      },
+      {
+        "title": "Accounts",
+        "path": "/accounts",
+        "icon": "Wallet"
+      },
+      {
+        "title": "Budgets",
+        "path": "/budgets",
+        "icon": "PiggyBank"
+      }
+    ]
+  },
+  {
+    "title": "Tools",
+    "items": [
+      {
+        "title": "Categories",
+        "path": "/categories",
+        "icon": "Tags"
+      },
+      {
+        "title": "Rules",
+        "path": "/rules",
+        "icon": "Zap"
+      },
+      {
+        "title": "Connections",
+        "path": "/connections",
+        "icon": "Plug"
+      }
+    ]
+  },
+  {
+    "title": "Account",
+    "items": [
+      {
+        "title": "Profile",
+        "path": "/settings/profile",
+        "icon": "User"
+      },
+      {
+        "title": "Preferences",
+        "path": "/settings/preferences",
+        "icon": "SlidersHorizontal"
+      }
+    ]
+  }
 ]
