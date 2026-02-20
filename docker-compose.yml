@@ -24,10 +24,13 @@ services:
             dockerfile: backend/Dockerfile
         container_name: backend
         ports:
-            - "3001:3001"
+            - "3008:3008"
         environment:
             - DATABASE_URL=postgres://user:password@db:5432/voseknowsdb
             - ENCRYPTION_KEY=${ENCRYPTION_KEY:-voseknows_secret_key_123}
+        dns:
+            - 1.1.1.1
+            - 1.0.0.1
         volumes:
             - ./backend:/app
             - /app/node_modules
