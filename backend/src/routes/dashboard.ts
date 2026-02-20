@@ -102,27 +102,25 @@ async function getSummary(startDate: string, endDate: string, userId: string) {
 }
 
 async function getWorthOverTime(startDate: string, endDate: string, userId: string) {
-    // 1. Get CURRENT total balance of all accounts (snapshot)
-    const currentRes = await query(
-        `SELECT SUM(balance) as total FROM accounts WHERE user_id = $1`,
-        [userId],
-    );
-    const currentBalance = parseFloat(currentRes.rows[0].total || "0");
+    // 1. Get the sum of starting balances of all accounts
+const startingRes = await query(
+    `SELECT SUM(balance) as total FROM accounts WHERE user_id = $1`,
+    [userId],
+);
+const sumStartingBalances = parseFloat(startingRes.rows[0].total || "0");
 
-    // 2. Get total change from startDate until NOW (to back-calculate)
-    // We strictly use > or >= based on whether we want start-of-day or end-of-day.
-    // To get Balance at Beginning of StartDate: Subtract ALL transactions >= StartDate
-    const intervalChangeRes = await query(
-        `SELECT SUM(amount) as total FROM transactions WHERE date >= $1 AND user_id = $2`,
-        [startDate, userId],
-    );
-    const intervalChange = parseFloat(intervalChangeRes.rows[0].total || "0");
+// 2. Get the sum of all transactions BEFORE the startDate
+const transactionsBeforeRes = await query(
+    `SELECT SUM(amount) as total FROM transactions WHERE date < $1 AND user_id = $2`,
+    [startDate, userId],
+);
+const sumTransactionsBefore = parseFloat(transactionsBeforeRes.rows[0].total || "0");
 
-    // Back-calculate buffer: The balance at the exact moment before StartDate's first transaction
-    let runningBalance = currentBalance - intervalChange;
+// The running balance at the beginning of the startDate
+let runningBalance = sumStartingBalances + sumTransactionsBefore;
 
-    // 3. Get daily changes within the requested range for the graph
-    const historySql = `
+// 3. Get daily changes within the requested range for the graph
+const historySql = `
         WITH date_series AS (
             SELECT generate_series($1::date, $2::date, '1 day'::interval)::date AS day
         ),
@@ -140,26 +138,26 @@ async function getWorthOverTime(startDate: string, endDate: string, userId: stri
         ORDER BY ds.day ASC
     `;
 
-    const { rows } = await query(historySql, [startDate, endDate, userId]);
+const { rows } = await query(historySql, [startDate, endDate, userId]);
 
-    // Calculate running total forward from the starting point
-    const history = rows.map((row: any) => {
-        const dailyChange = parseFloat(row.change);
-        runningBalance += dailyChange;
+// Calculate running total forward day-by-day
+const history = rows.map((row: any) => {
+    const dailyChange = parseFloat(row.change);
+    runningBalance += dailyChange;
 
-        const dateStr = new Date(row.date).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-        });
-
-        return {
-            name: dateStr,
-            worth: parseFloat(runningBalance.toFixed(2)),
-            budget: 0,
-        };
+    const dateStr = new Date(row.date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
     });
 
-    return history;
+    return {
+        name: dateStr,
+        worth: parseFloat(runningBalance.toFixed(2)),
+        budget: 0,
+    };
+});
+
+return history;
 }
 
 async function getCategoryVariance(startDate: string, endDate: string, userId: string) {

@@ -86,56 +86,87 @@ export class AmexScraper implements BankScraper {
                     // Fill Credentials
                     if (!this.config.username || !this.config.password) throw new Error("Missing credentials");
 
-                    try { await page.waitForSelector('input[type="password"]', { timeout: 10000 }); } catch (e) { }
+                    log.info(`Attempt ${attempt}: Filling credentials...`);
 
-                    // Fill User (Slow Type)
-                    const userSelectors = ['input[id="eliloUserID"]', 'input[type="email"]', 'input[type="text"]'];
-                    for (const sel of userSelectors) {
-                        try {
-                            if (await page.$(sel)) {
-                                await page.click(sel);
-                                await page.type(sel, this.config.username, { delay: 100 }); // Human speed
-                                break;
-                            }
-                        } catch (e) { }
-                    }
-
-                    // Fill Pass (Slow Type)
-                    const passSelectors = ['input[id="eliloPassword"]', 'input[type="password"]'];
-                    for (const sel of passSelectors) {
-                        try {
-                            if (await page.$(sel)) {
-                                await page.click(sel);
-                                await page.type(sel, this.config.password, { delay: 100 });
-                                break;
-                            }
-                        } catch (e) { }
-                    }
-
-                    log.info(`Attempt ${attempt}: Submitting credentials...`);
-                    let submitBtn = await page.$('#loginSubmit') || await page.$('button[type="submit"]');
-                    if (submitBtn) {
-                        try {
-                            // Human Move & Click
-                            const box = await submitBtn.boundingBox();
-                            if (box) {
-                                await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 10 });
-                                await page.mouse.down();
-                                await page.mouse.up();
-                            } else {
-                                await submitBtn.click();
-                            }
-                        } catch (e) {
-                            await page.keyboard.press('Enter');
+                    // 1. Fill User ID
+                    let userFilled = false;
+                    try {
+                        // Try modern accessible selectors first
+                        const userInput = page.getByLabel(/User ID|Username|User Name/i).first();
+                        if (await userInput.isVisible()) {
+                            await userInput.click();
+                            await userInput.fill(this.config.username);
+                            userFilled = true;
                         }
-                    } else {
+                    } catch (e) { }
+
+                    if (!userFilled) {
+                        // Fallback to old selectors
+                        const userSelectors = ['input[id="eliloUserID"]', 'input[type="email"]', 'input[type="text"]', '#lilo_userName'];
+                        for (const sel of userSelectors) {
+                            try {
+                                if (await page.locator(sel).first().isVisible()) {
+                                    await page.locator(sel).first().click();
+                                    await page.type(sel, this.config.username, { delay: 50 });
+                                    userFilled = true;
+                                    break;
+                                }
+                            } catch (e) { }
+                        }
+                    }
+
+                    // 2. Fill Password
+                    let passFilled = false;
+                    try {
+                        const passInput = page.getByLabel(/Password/i).first();
+                        if (await passInput.isVisible()) {
+                            await passInput.click();
+                            await passInput.fill(this.config.password);
+                            passFilled = true;
+                        }
+                    } catch (e) { }
+
+                    if (!passFilled) {
+                        const passSelectors = ['input[id="eliloPassword"]', 'input[type="password"]', '#lilo_password'];
+                        for (const sel of passSelectors) {
+                            try {
+                                if (await page.locator(sel).first().isVisible()) {
+                                    await page.locator(sel).first().click();
+                                    await page.type(sel, this.config.password, { delay: 50 });
+                                    passFilled = true;
+                                    break;
+                                }
+                            } catch (e) { }
+                        }
+                    }
+
+                    if (!userFilled || !passFilled) {
+                        log.warning(`Could not find login fields. User: ${userFilled}, Pass: ${passFilled}`);
+                        try { await page.screenshot({ path: path.join(this.exportDir, 'amex_fields_missing.png') }); } catch (e) { }
+                    }
+
+                    log.info(`Attempt ${attempt}: Submitting...`);
+
+                    // 3. Submit
+                    try {
+                        const submitBtn = page.getByRole('button', { name: /Log In|Login|Sign In/i }).first();
+                        if (await submitBtn.isVisible()) {
+                            await submitBtn.click();
+                        } else {
+                            // Fallback
+                            const altBtn = await page.$('#loginSubmit') || await page.$('button[type="submit"]');
+                            if (altBtn) await altBtn.click();
+                            else await page.keyboard.press('Enter');
+                        }
+                    } catch (e) {
                         await page.keyboard.press('Enter');
                     }
 
                     // Extended Wait for Navigation (20s)
                     try {
-                        await page.waitForTimeout(5000);
-                        await page.waitForLoadState('networkidle', { timeout: 15000 });
+                        await page.waitForTimeout(5000); // Give time for submission
+                        await page.waitForLoadState('networkidle', { timeout: 20000 });
+                        await page.waitForLoadState('domcontentloaded');
                     } catch (e) { }
 
                     if (await this.isLoggedIn(page)) {
@@ -143,12 +174,18 @@ export class AmexScraper implements BankScraper {
                         loginSuccess = true;
                         break;
                     } else {
-                        log.warning(`Attempt ${attempt} verification failed.`);
+                        log.warning(`Attempt ${attempt} verification failed. URL: ${page.url()}`);
                         // Check for specific error
                         try {
-                            const err = await page.$eval('.dls-icon-message-wrapper', (el: any) => el.innerText);
-                            if (err) log.warning(`Amex UI Error: ${err}`);
+                            const errEl = await page.locator('.dls-icon-message-wrapper').first();
+                            if (await errEl.isVisible()) {
+                                const err = await errEl.innerText();
+                                log.warning(`Amex UI Error: ${err}`);
+                            }
                         } catch (e) { }
+
+                        // Screenshot failure
+                        try { await page.screenshot({ path: path.join(this.exportDir, `amex_login_attempt_${attempt}_fail.png`) }); } catch (e) { }
                     }
                 }
 
